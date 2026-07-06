@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Smooth horizontal scrolling and scrollbars */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbars for a modern look */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.8);
+}
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .print\:block {
+    display: block !important;
+  }
+  .print\:p-0 {
+    padding: 0 !important;
+  }
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+  .print\:static {
+    position: static !important;
+  }
+  .print\:max-h-full {
+    max-height: none !important;
+  }
+}
+
+/* Bottom spacing for all scrollable view containers to prevent clipping from the footer */
+#dashboard-view-container::after,
+#household-view-container::after,
+#demographics-change-container::after,
+#business-view-container::after,
+#social-security-container::after,
+#new-rural-container::after,
+#resident-view-container::after,
+#quarter-documents-root::after,
+#ai-copilot-container::after,
+#allowed-emails-container::after,
+#admin-panel-container::after {
+  content: "";
+  display: block;
+  height: 96px; /* equal to h-24 */
+  width: 100%;
+  flex-shrink: 0;
+  clear: both;
+}
+
+@media (min-width: 640px) {
+  #dashboard-view-container::after,
+  #household-view-container::after,
+  #demographics-change-container::after,
+  #business-view-container::after,
+  #social-security-container::after,
+  #new-rural-container::after,
+  #resident-view-container::after,
+  #quarter-documents-root::after,
+  #ai-copilot-container::after,
+  #allowed-emails-container::after,
+  #admin-panel-container::after {
+    height: 128px; /* equal to h-32 */
+  }
+}
