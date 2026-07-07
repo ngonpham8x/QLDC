@@ -174,7 +174,7 @@ export default function App() {
           }
           setLoginError("");
         } else {
-          setLoginError(`Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (BHTTQ3@gmail.com) để được cấp quyền.`);
+          setLoginError(`Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`);
           setCurrentUser(null);
           localStorage.removeItem("currentUser");
           await contextLogout();
@@ -2102,7 +2102,7 @@ export default function App() {
                 {/* Visual Banner */}
                 <div className="bg-emerald-800 p-5 max-[400px]:p-4 text-center text-white space-y-2 flex flex-col items-center">
                   <div className="w-18 h-18 max-[400px]:w-14 max-[400px]:h-14 rounded-full bg-white border-2 border-emerald-500/20 shadow-lg overflow-hidden flex items-center justify-center p-0.5">
-                    <img src={officialLogo} alt="Logo" className="w-full h-full object-cover rounded-full" />
+                    <img src={officialLogo} alt="Logo" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm tracking-tight uppercase max-[400px]:text-xs">CỔNG XÁC THỰC CÁN BỘ SỐ</h3>
@@ -2350,7 +2350,7 @@ export default function App() {
                  {/* Brand Header (Fixed Top) */}
                 <div className={`p-4 ${isSidebarHidden ? "pb-3" : "pb-4 sm:p-6"} border-b border-slate-800/60 shrink-0 flex flex-col items-center text-center gap-2`}>
                   <div className="w-14 h-14 rounded-full bg-white border-2 border-blue-500/30 overflow-hidden flex items-center justify-center p-0.5 shadow-lg shrink-0">
-                    <img src={officialLogo} alt="Logo" className="w-full h-full object-cover rounded-full" />
+                    <img src={officialLogo} alt="Logo" className="w-full h-full object-cover rounded-full" referrerPolicy="no-referrer" />
                   </div>
                   {!isSidebarHidden && (
                     <div className="text-center mt-1">
