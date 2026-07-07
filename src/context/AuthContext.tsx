@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { User, onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { auth, googleAuthProvider } from '../firebase';
 
 interface AuthContextType {
@@ -7,6 +7,7 @@ interface AuthContextType {
   loading: boolean;
   token: string | null;
   login: () => Promise<void>;
+  loginWithRedirect: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -60,6 +61,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const loginWithRedirect = async () => {
+    try {
+      await signInWithRedirect(auth, googleAuthProvider);
+    } catch (error: any) {
+      console.error('Login with redirect error:', error);
+      throw error;
+    }
+  };
+
   const logout = async () => {
     try {
       await signOut(auth);
@@ -69,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, token, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, token, login, loginWithRedirect, logout }}>
       {children}
     </AuthContext.Provider>
   );

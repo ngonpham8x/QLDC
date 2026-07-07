@@ -34,7 +34,7 @@ import MovableChatbox from "./components/MovableChatbox";
 import officialLogo from "./assets/images/logo_phuong_binh_minh_official_1782824466988.png";
 
 export default function App() {
-  const { user, login: contextLogin, logout: contextLogout } = useAuth();
+  const { user, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
     const saved = localStorage.getItem("currentUser");
     const passed2FA = sessionStorage.getItem("passed2FA");
@@ -466,9 +466,9 @@ export default function App() {
 
         if (isInsideIframe) {
           setLoginError(
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <p className="font-bold text-rose-800">Cửa sổ đăng nhập (Google Popup) bị chặn hoặc không thể hiển thị trong khung bảo mật (IFrame) của AI Studio.</p>
-              <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
+              <p className="text-[10px] text-slate-300 font-medium leading-relaxed">
                 Vui lòng mở ứng dụng trực tiếp trong tab mới để đăng nhập bằng tài khoản Google thực tế một cách an toàn:
               </p>
               <a 
@@ -479,6 +479,18 @@ export default function App() {
               >
                 Mở trong Tab mới ↗
               </a>
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-700"></div>
+                <span className="flex-shrink mx-2 text-slate-500 text-[9px] uppercase font-bold">Hoặc thử</span>
+                <div className="flex-grow border-t border-slate-700"></div>
+              </div>
+              <button
+                type="button"
+                onClick={handleGoogleLoginRedirect}
+                className="block w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[10px] uppercase shadow-sm transition-all cursor-pointer"
+              >
+                Đăng nhập Chuyển hướng (Redirect) 🔄
+              </button>
             </div>
           );
         } else if (errorCode.includes("unauthorized-domain") || errorStr.includes("unauthorized-domain") || isRedirectIssue) {
@@ -500,8 +512,15 @@ export default function App() {
               <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
                 Cửa sổ đăng nhập Google (Popup) đã bị trình duyệt chặn hiển thị hoặc đã bị cán bộ đóng trước khi hoàn tất đăng nhập.
               </p>
+              <button
+                type="button"
+                onClick={handleGoogleLoginRedirect}
+                className="mt-2 block w-full text-center py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[10px] uppercase shadow-sm transition-all cursor-pointer"
+              >
+                Đăng nhập bằng Chuyển hướng (Google Redirect) 🔄
+              </button>
               <p className="text-[9.5px] text-slate-500 leading-relaxed pt-1 border-t border-amber-200">
-                <strong>Cách xử lý:</strong> Vui lòng cho phép hiển thị cửa sổ bật lên (popups) cho trang web này trên thanh địa chỉ trình duyệt, hoặc thử nhấp lại nút đăng nhập và giữ nguyên cửa sổ cho đến khi tải xong.
+                <strong>Cách xử lý khác:</strong> Vui lòng cho phép hiển thị cửa sổ bật lên (popups) cho trang web này trên thanh địa chỉ trình duyệt, hoặc nhấp nút Đăng nhập Chuyển hướng ở trên (không cần mở popup).
               </p>
             </div>
           );
@@ -510,6 +529,20 @@ export default function App() {
         console.error('Google login trigger error:', error);
         setLoginError(`Lỗi Google Auth thực tế: ${error.message || "Vui lòng kiểm tra lại kết nối mạng."}`);
       }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleLoginRedirect = async () => {
+    setGoogleLoading(true);
+    setLoginError("");
+    try {
+      await contextLoginWithRedirect();
+      setLoginError("");
+    } catch (error: any) {
+      console.error('Google login redirect error:', error);
+      setLoginError(`Lỗi đăng nhập Google Redirect: ${error.message || "Vui lòng kiểm tra lại kết nối mạng."}`);
     } finally {
       setGoogleLoading(false);
     }
@@ -2093,6 +2126,17 @@ export default function App() {
                           </svg>
                           <span>{googleLoading ? "Đang kết nối..." : "Google Admin Sign-in"}</span>
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginRole(UserRole.SUPER_ADMIN);
+                            handleGoogleLoginRedirect();
+                          }}
+                          disabled={googleLoading}
+                          className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white font-bold rounded-xl border border-slate-700/60 shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer duration-200 active:scale-[0.98] text-[10px]"
+                        >
+                          <span>{googleLoading ? "Đang kết nối..." : "🔄 Admin Redirect Sign-in (Không dùng Popup)"}</span>
+                        </button>
                       </div>
 
                       <div className="pt-2 text-center border-t border-slate-900 flex flex-col items-center gap-1.5">
@@ -2236,6 +2280,14 @@ export default function App() {
                           </svg>
                           <span>{googleLoading ? "Đang kết nối Google..." : "Xác thực bằng Google Gmail"}</span>
                         </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleGoogleLoginRedirect}
+                        disabled={googleLoading}
+                        className="w-full py-2 px-3 text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer text-center border border-dashed border-slate-200 rounded-lg bg-slate-50/50 hover:bg-slate-50 flex items-center justify-center gap-1.5"
+                      >
+                        <span>{googleLoading ? "Đang kết nối..." : "🔄 Đăng nhập Chuyển hướng (Không dùng Popup)"}</span>
                       </button>
                     </div>
 
