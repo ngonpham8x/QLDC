@@ -481,13 +481,25 @@ export default function App() {
               </a>
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-slate-700"></div>
+                <span className="flex-shrink mx-2 text-slate-500 text-[9px] uppercase font-bold">Hoặc đăng nhập nhanh</span>
+                <div className="flex-grow border-t border-slate-700"></div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDemoBypass}
+                className="block w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-xl text-[10px] uppercase shadow-md hover:shadow-lg transition-all cursor-pointer animate-pulse text-center"
+              >
+                🔑 ĐĂNG NHẬP BYPASS (Xác thực 2FA) 🚀
+              </button>
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-700"></div>
                 <span className="flex-shrink mx-2 text-slate-500 text-[9px] uppercase font-bold">Hoặc thử</span>
                 <div className="flex-grow border-t border-slate-700"></div>
               </div>
               <button
                 type="button"
                 onClick={handleGoogleLoginRedirect}
-                className="block w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-[10px] uppercase shadow-sm transition-all cursor-pointer"
+                className="block w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-[10px] uppercase shadow-sm transition-all cursor-pointer text-center"
               >
                 Đăng nhập Chuyển hướng (Redirect) 🔄
               </button>
@@ -2137,6 +2149,17 @@ export default function App() {
                         >
                           <span>{googleLoading ? "Đang kết nối..." : "🔄 Admin Redirect Sign-in (Không dùng Popup)"}</span>
                         </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLoginRole(UserRole.SUPER_ADMIN);
+                            handleDemoBypass();
+                          }}
+                          className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-xl border border-emerald-500/30 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer duration-200 active:scale-[0.98] text-[10px] uppercase tracking-wider animate-pulse"
+                        >
+                          <span>🔑 Admin Demo Bypass Sign-in (2FA) 🚀</span>
+                        </button>
                       </div>
 
                       <div className="pt-2 text-center border-t border-slate-900 flex flex-col items-center gap-1.5">
@@ -2288,6 +2311,14 @@ export default function App() {
                         className="w-full py-2 px-3 text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer text-center border border-dashed border-slate-200 rounded-lg bg-slate-50/50 hover:bg-slate-50 flex items-center justify-center gap-1.5"
                       >
                         <span>{googleLoading ? "Đang kết nối..." : "🔄 Đăng nhập Chuyển hướng (Không dùng Popup)"}</span>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={handleDemoBypass}
+                        className="w-full py-2.5 px-3 text-[11px] font-black text-emerald-800 hover:text-white transition-all cursor-pointer text-center border border-emerald-600 rounded-xl bg-emerald-50 hover:bg-emerald-600 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] duration-150 uppercase"
+                      >
+                        <span>🔑 Đăng nhập nhanh Demo (Bypass IFrame) 🚀</span>
                       </button>
                     </div>
 
