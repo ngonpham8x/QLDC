@@ -455,23 +455,57 @@ export default function App() {
       );
 
       if (isPopupIssue || isRedirectIssue) {
-        console.warn('Google login trigger warning (popup issue / redirect mismatch in iframe):', error);
-        setLoginError(
-          <div className="space-y-2">
-            <p className="font-bold text-rose-800">Cửa sổ đăng nhập (Google Popup) bị chặn hoặc không thể hiển thị trong khung bảo mật (IFrame) của AI Studio.</p>
-            <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
-              Vui lòng mở ứng dụng trực tiếp trong tab mới để đăng nhập bằng tài khoản Google thực tế một cách an toàn:
-            </p>
-            <a 
-              href={window.location.href} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="mt-2 block w-full text-center py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-[11px] uppercase shadow-md hover:shadow-lg transition-all animate-pulse"
-            >
-              Mở trong Tab mới ↗
-            </a>
-          </div>
-        );
+        console.warn('Google login trigger warning (popup issue / redirect mismatch):', error);
+        
+        let isInsideIframe = false;
+        try {
+          isInsideIframe = window.self !== window.top;
+        } catch (e) {
+          isInsideIframe = true;
+        }
+
+        if (isInsideIframe) {
+          setLoginError(
+            <div className="space-y-2">
+              <p className="font-bold text-rose-800">Cửa sổ đăng nhập (Google Popup) bị chặn hoặc không thể hiển thị trong khung bảo mật (IFrame) của AI Studio.</p>
+              <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
+                Vui lòng mở ứng dụng trực tiếp trong tab mới để đăng nhập bằng tài khoản Google thực tế một cách an toàn:
+              </p>
+              <a 
+                href={window.location.href} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="mt-2 block w-full text-center py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-[11px] uppercase shadow-md hover:shadow-lg transition-all animate-pulse"
+              >
+                Mở trong Tab mới ↗
+              </a>
+            </div>
+          );
+        } else if (errorCode.includes("unauthorized-domain") || errorStr.includes("unauthorized-domain") || isRedirectIssue) {
+          setLoginError(
+            <div className="space-y-2 p-3.5 bg-rose-50/80 border border-rose-250 rounded-xl text-left shadow-xs">
+              <p className="font-bold text-rose-800 text-[11px] uppercase tracking-wide flex items-center gap-1">⚠️ Lỗi: Tên miền chưa được cấp phép (Unauthorized Domain)</p>
+              <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
+                Tên miền hiện tại (<code className="bg-white border border-slate-200 px-1 py-0.5 rounded text-rose-600 font-mono text-[9px] break-all">{window.location.hostname}</code>) chưa được thêm vào danh sách <strong className="text-slate-800">Authorized Domains</strong> trong cấu hình Firebase Authentication.
+              </p>
+              <p className="text-[9.5px] text-slate-500 leading-relaxed pt-1 border-t border-rose-100">
+                <strong>Hướng dẫn khắc phục:</strong> Cán bộ cần truy cập <span className="font-semibold text-slate-700">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</span> và nhấp <span className="font-semibold text-slate-700">"Add domain"</span> để thêm tên miền trên vào hệ thống trước khi đăng nhập Google.
+              </p>
+            </div>
+          );
+        } else {
+          setLoginError(
+            <div className="space-y-2 p-3.5 bg-amber-50/80 border border-amber-250 rounded-xl text-left shadow-xs">
+              <p className="font-bold text-amber-800 text-[11px] uppercase tracking-wide flex items-center gap-1">⚠️ Cửa sổ đăng nhập bị chặn hoặc đóng</p>
+              <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
+                Cửa sổ đăng nhập Google (Popup) đã bị trình duyệt chặn hiển thị hoặc đã bị cán bộ đóng trước khi hoàn tất đăng nhập.
+              </p>
+              <p className="text-[9.5px] text-slate-500 leading-relaxed pt-1 border-t border-amber-200">
+                <strong>Cách xử lý:</strong> Vui lòng cho phép hiển thị cửa sổ bật lên (popups) cho trang web này trên thanh địa chỉ trình duyệt, hoặc thử nhấp lại nút đăng nhập và giữ nguyên cửa sổ cho đến khi tải xong.
+              </p>
+            </div>
+          );
+        }
       } else {
         console.error('Google login trigger error:', error);
         setLoginError(`Lỗi Google Auth thực tế: ${error.message || "Vui lòng kiểm tra lại kết nối mạng."}`);
@@ -2558,6 +2592,20 @@ export default function App() {
                         <option value="permissions" className="text-center">Cấp quyền truy cập</option>
                       )}
                     </select>
+
+                    {/* Toggle AI Button for mobile */}
+                    <button
+                      onClick={handleToggleAIChatbox}
+                      className={`flex items-center gap-1 px-2 py-1 border rounded-lg cursor-pointer transition-all active:scale-95 shrink-0 ${
+                        showAIChatbox
+                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                          : "bg-slate-800 text-slate-400 border-slate-750 hover:text-slate-200"
+                      }`}
+                      title={showAIChatbox ? "Tắt Trợ lý AI" : "Bật Trợ lý AI"}
+                    >
+                      <Bot className={`w-3 h-3 ${showAIChatbox ? "animate-pulse text-emerald-400" : "text-slate-400"}`} />
+                      <span className="text-[9px] font-extrabold uppercase">AI</span>
+                    </button>
 
                     <button 
                       onClick={handleLogout} 
