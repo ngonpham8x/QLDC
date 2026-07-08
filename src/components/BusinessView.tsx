@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import { BusinessHousehold, User, UserRole, Resident, Household, HouseholdStatus, WaterSource, WasteCollectionStatus } from "../types";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import { 
   Briefcase as BusinessIcon, Search as SearchIcon, Plus as PlusIcon, 
   Edit as EditIcon, Trash2 as TrashIcon, X as XIcon, Check as CheckIcon, 
@@ -28,6 +29,8 @@ export default function BusinessView({
 }: BusinessViewProps) {
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [businessToDelete, setBusinessToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
 
@@ -299,9 +302,8 @@ export default function BusinessView({
                 {currentUser?.role !== UserRole.COLLABORATOR && (
                   <button
                     onClick={() => {
-                      if (confirm(`Bạn có chắc chắn muốn huỷ bỏ và thu hồi đăng ký kinh doanh của ${b.name}?`)) {
-                        onDeleteBusiness(b.id);
-                      }
+                      setBusinessToDelete({ id: b.id, name: b.name });
+                      setDeleteModalOpen(true);
                     }}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
                     title="Xoá đăng ký kinh doanh"
@@ -798,6 +800,25 @@ export default function BusinessView({
           </div>
         </div>
       )}
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalOpen && businessToDelete !== null}
+        title={`Thu hồi và xoá đăng ký kinh doanh: ${businessToDelete?.name}`}
+        description={`Bạn có chắc chắn muốn thu hồi và xoá vĩnh viễn giấy phép/đăng ký kinh doanh này? Lưu ý: Hành động này không thể khôi phục.`}
+        confirmWord={businessToDelete?.name || "XOÁ"}
+        placeholder={`Nhập tên hộ kinh doanh '${businessToDelete?.name}' để xác nhận`}
+        onConfirm={() => {
+          if (businessToDelete) {
+            onDeleteBusiness(businessToDelete.id);
+          }
+          setDeleteModalOpen(false);
+          setBusinessToDelete(null);
+        }}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setBusinessToDelete(null);
+        }}
+      />
     </div>
   );
 }

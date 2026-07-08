@@ -175,6 +175,16 @@ export default function App() {
           setLoginError("");
         } else {
           setLoginError(`Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`);
+          // Call server API to log this unauthorized attempt and trigger an email warning
+          try {
+            fetch("/api/auth/unauthorized-attempt", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, displayName })
+            }).catch(e => console.warn("Failed to report unauthorized attempt", e));
+          } catch (err) {
+            console.error("Error calling unauthorized logging", err);
+          }
           setCurrentUser(null);
           localStorage.removeItem("currentUser");
           await contextLogout();
@@ -226,6 +236,7 @@ export default function App() {
   // Backup States
   const [lastBackupDate, setLastBackupDate] = useState<string | null>(null);
   const [showBackupReminder, setShowBackupReminder] = useState<boolean>(false);
+  const [latestSecurityAlert, setLatestSecurityAlert] = useState<any | null>(null);
 
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<string>("dashboard");
@@ -249,6 +260,14 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [offlineQueue, setOfflineQueue] = useState<{ id: string; url: string; method: string; body: any; description: string }[]>([]);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Beautiful Custom Alert state
+  const [appAlert, setAppAlert] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "success" | "error" | "info";
+  } | null>(null);
 
   // Zoom scaling state
   const [zoomScale, setZoomScale] = useState<number>(() => {
@@ -399,6 +418,31 @@ export default function App() {
     }
   };
 
+  const checkSecurityAlerts = async () => {
+    if (currentUser && currentUser.role === UserRole.SUPER_ADMIN) {
+      try {
+        const res = await fetch("/api/logs");
+        if (res.ok) {
+          const logs = await res.json();
+          // Filter logs that are security warnings (like unauthorized access attempts)
+          const securityLogs = logs.filter((log: any) => 
+            log.action?.includes("CẢNH BÁO") || 
+            log.details?.includes("chưa được cấp quyền")
+          );
+          if (securityLogs && securityLogs.length > 0) {
+            setLatestSecurityAlert(securityLogs[0]); // most recent log is at index 0
+          } else {
+            setLatestSecurityAlert(null);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to check security alerts", e);
+      }
+    } else {
+      setLatestSecurityAlert(null);
+    }
+  };
+
   useEffect(() => {
     // Read saved queue on startup
     const savedQueue = localStorage.getItem("offline_queue");
@@ -419,8 +463,10 @@ export default function App() {
       const stored = localStorage.getItem("last_backup_date");
       setLastBackupDate(stored);
       setShowBackupReminder(false);
+      checkSecurityAlerts();
     } else {
       setShowBackupReminder(false);
+      setLatestSecurityAlert(null);
     }
   }, [currentUser]);
 
@@ -464,7 +510,21 @@ export default function App() {
           isInsideIframe = true;
         }
 
-        if (isInsideIframe) {
+        const isExplicitConfigIssue = errorCode.includes("unauthorized-domain") || errorStr.includes("unauthorized-domain") || isRedirectIssue;
+
+        if (isExplicitConfigIssue) {
+          setLoginError(
+            <div className="space-y-2 p-3.5 bg-rose-50/80 border border-rose-250 rounded-xl text-left shadow-xs">
+              <p className="font-bold text-rose-800 text-[11px] uppercase tracking-wide flex items-center gap-1">⚠️ Lỗi: Tên miền chưa được cấp phép (Unauthorized Domain)</p>
+              <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
+                Tên miền hiện tại (<code className="bg-white border border-slate-200 px-1 py-0.5 rounded text-rose-600 font-mono text-[9px] break-all">{window.location.hostname}</code>) chưa được thêm vào danh sách <strong className="text-slate-800">Authorized Domains</strong> trong cấu hình Firebase Authentication.
+              </p>
+              <p className="text-[9.5px] text-slate-500 leading-relaxed pt-1 border-t border-rose-100">
+                <strong>Hướng dẫn khắc phục:</strong> Cán bộ cần truy cập <span className="font-semibold text-slate-700">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</span> và nhấp <span className="font-semibold text-slate-700">"Add domain"</span> để thêm tên miền trên (<code className="font-semibold text-slate-700">{window.location.hostname}</code>) vào hệ thống trước khi đăng nhập Google.
+              </p>
+            </div>
+          );
+        } else if (isInsideIframe) {
           setLoginError(
             <div className="space-y-2 text-left">
               <p className="font-bold text-rose-800">Cửa sổ đăng nhập (Google Popup) bị chặn hoặc không thể hiển thị trong khung bảo mật (IFrame) của AI Studio.</p>
@@ -481,18 +541,6 @@ export default function App() {
               </a>
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-slate-700"></div>
-                <span className="flex-shrink mx-2 text-slate-500 text-[9px] uppercase font-bold">Hoặc đăng nhập nhanh</span>
-                <div className="flex-grow border-t border-slate-700"></div>
-              </div>
-              <button
-                type="button"
-                onClick={handleDemoBypass}
-                className="block w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-xl text-[10px] uppercase shadow-md hover:shadow-lg transition-all cursor-pointer animate-pulse text-center"
-              >
-                🔑 ĐĂNG NHẬP BYPASS (Xác thực 2FA) 🚀
-              </button>
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-slate-700"></div>
                 <span className="flex-shrink mx-2 text-slate-500 text-[9px] uppercase font-bold">Hoặc thử</span>
                 <div className="flex-grow border-t border-slate-700"></div>
               </div>
@@ -503,18 +551,6 @@ export default function App() {
               >
                 Đăng nhập Chuyển hướng (Redirect) 🔄
               </button>
-            </div>
-          );
-        } else if (errorCode.includes("unauthorized-domain") || errorStr.includes("unauthorized-domain") || isRedirectIssue) {
-          setLoginError(
-            <div className="space-y-2 p-3.5 bg-rose-50/80 border border-rose-250 rounded-xl text-left shadow-xs">
-              <p className="font-bold text-rose-800 text-[11px] uppercase tracking-wide flex items-center gap-1">⚠️ Lỗi: Tên miền chưa được cấp phép (Unauthorized Domain)</p>
-              <p className="text-[10px] text-slate-600 font-medium leading-relaxed">
-                Tên miền hiện tại (<code className="bg-white border border-slate-200 px-1 py-0.5 rounded text-rose-600 font-mono text-[9px] break-all">{window.location.hostname}</code>) chưa được thêm vào danh sách <strong className="text-slate-800">Authorized Domains</strong> trong cấu hình Firebase Authentication.
-              </p>
-              <p className="text-[9.5px] text-slate-500 leading-relaxed pt-1 border-t border-rose-100">
-                <strong>Hướng dẫn khắc phục:</strong> Cán bộ cần truy cập <span className="font-semibold text-slate-700">Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</span> và nhấp <span className="font-semibold text-slate-700">"Add domain"</span> để thêm tên miền trên vào hệ thống trước khi đăng nhập Google.
-              </p>
             </div>
           );
         } else {
@@ -956,21 +992,36 @@ export default function App() {
       if (response.ok) {
         const result = await response.json();
         await fetchData(); // Refresh state from backend
-        alert(`[KHỞI TẠO THÀNH CÔNG] Đã tự động sinh 25 Hộ gia đình mẫu với ${result.residentsCount} Nhân khẩu chi tiết! Dữ liệu đã đồng bộ và sẵn sàng phục vụ thống kê, xuất báo cáo.`);
+        setAppAlert({
+          isOpen: true,
+          title: "Khởi tạo thành công",
+          message: `Đã tự động sinh 25 Hộ gia đình mẫu với ${result.residentsCount} Nhân khẩu chi tiết! Dữ liệu đã đồng bộ và sẵn sàng phục vụ thống kê, xuất báo cáo.`,
+          type: "success"
+        });
       } else {
         const err = await response.text();
-        alert(`[LỖI] Không thể tạo dữ liệu mẫu: ${err}`);
+        setAppAlert({
+          isOpen: true,
+          title: "Lỗi khởi tạo",
+          message: `Không thể tạo dữ liệu mẫu: ${err}`,
+          type: "error"
+        });
       }
     } catch (err: any) {
       console.error("Lỗi khi kết nối máy chủ:", err);
-      alert(`[LỖI] Lỗi kết nối: ${err.message}`);
+      setAppAlert({
+        isOpen: true,
+        title: "Lỗi kết nối",
+        message: err.message,
+        type: "error"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClearAllData = async () => {
-    if (!window.confirm("CẢNH BÁO: Hành động này sẽ xoá TOÀN BỘ dữ liệu hộ dân, nhân khẩu, hộ kinh doanh hiện có trong hệ thống để chuẩn bị nhập dữ liệu thực tế. Bạn có chắc chắn muốn tiếp tục?")) {
+  const handleClearAllData = async (bypassConfirm = false) => {
+    if (!bypassConfirm && !window.confirm("CẢNH BÁO: Hành động này sẽ xoá TOÀN BỘ dữ liệu hộ dân, nhân khẩu, hộ kinh doanh hiện có trong hệ thống để chuẩn bị nhập dữ liệu thực tế. Bạn có chắc chắn muốn tiếp tục?")) {
       return;
     }
     setLoading(true);
@@ -979,15 +1030,36 @@ export default function App() {
         method: "POST"
       });
       if (response.ok) {
+        // Clear offline local storage cache keys immediately
+        localStorage.setItem("off_households", "[]");
+        localStorage.setItem("off_residents", "[]");
+        localStorage.setItem("off_businesses", "[]");
+        localStorage.setItem("off_changes", "[]");
+        
         await fetchData(); // Refresh state from backend
-        alert("[ĐÃ XOÁ THÀNH CÔNG] Toàn bộ dữ liệu mẫu đã được xoá sạch khỏi hệ thống. Bây giờ bạn có thể tiến hành nhập dữ liệu thực tế.");
+        setAppAlert({
+          isOpen: true,
+          title: "Xoá sạch dữ liệu thành công",
+          message: "Toàn bộ dữ liệu mẫu đã được xoá sạch khỏi hệ thống. Bây giờ bạn có thể tiến hành nhập dữ liệu thực tế.",
+          type: "success"
+        });
       } else {
         const err = await response.text();
-        alert(`[LỖI] Không thể xoá dữ liệu: ${err}`);
+        setAppAlert({
+          isOpen: true,
+          title: "Lỗi xoá dữ liệu",
+          message: err,
+          type: "error"
+        });
       }
     } catch (err: any) {
       console.error("Lỗi khi kết nối máy chủ để xoá dữ liệu:", err);
-      alert(`[LỖI] Lỗi kết nối: ${err.message}`);
+      setAppAlert({
+        isOpen: true,
+        title: "Lỗi kết nối",
+        message: err.message,
+        type: "error"
+      });
     } finally {
       setLoading(false);
     }
@@ -1510,62 +1582,110 @@ export default function App() {
       if (response.ok) {
         const result = await response.json();
         await fetchData();
-        alert(`[PHỤC HỒI THÀNH CÔNG] Toàn bộ dữ liệu đã được khôi phục thành công lên hệ thống:\n- Hộ dân: ${result.householdsCount}\n- Nhân khẩu: ${result.residentsCount}\n- Hộ kinh doanh: ${result.businessesCount}\n- Biến động: ${result.changesCount}\n- Tiêu chí: ${result.criteriaCount}${result.documentsCount !== undefined ? `\n- Tài liệu lưu trữ: ${result.documentsCount}` : ""}`);
+        setAppAlert({
+          isOpen: true,
+          title: "Khôi phục thành công",
+          message: `Toàn bộ dữ liệu đã được khôi phục thành công lên hệ thống:\n- Hộ dân: ${result.householdsCount}\n- Nhân khẩu: ${result.residentsCount}\n- Hộ kinh doanh: ${result.businessesCount}\n- Biến động: ${result.changesCount}\n- Tiêu chí: ${result.criteriaCount}${result.documentsCount !== undefined ? `\n- Tài liệu lưu trữ: ${result.documentsCount}` : ""}`,
+          type: "success"
+        });
       } else {
         const err = await response.text();
-        alert(`[LỖI SERVER] Không thể khôi phục dữ liệu: ${err}`);
+        setAppAlert({
+          isOpen: true,
+          title: "Lỗi khôi phục",
+          message: `Không thể khôi phục dữ liệu: ${err}`,
+          type: "error"
+        });
+        throw new Error(err);
       }
     } catch (err: any) {
-      alert(`[LỖI KẾT NỐI] ${err.message}`);
+      setAppAlert({
+        isOpen: true,
+        title: "Lỗi kết nối",
+        message: err.message,
+        type: "error"
+      });
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRestoreBackup = async (file: File) => {
-    setLoading(true);
-    try {
-      const isJson = file.name.endsWith(".json");
-      const isXlsx = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+  const handleRestoreBackup = (file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      setLoading(true);
+      try {
+        const isJson = file.name.endsWith(".json");
+        const isXlsx = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
 
-      if (!isJson && !isXlsx) {
-        alert("[LỖI ĐỊNH DẠNG] Chỉ chấp nhận tập tin sao lưu dạng .json hoặc .xlsx");
+        if (!isJson && !isXlsx) {
+          const errMsg = "Chỉ chấp nhận tập tin sao lưu dạng .json hoặc .xlsx";
+          setAppAlert({
+            isOpen: true,
+            title: "Lỗi định dạng",
+            message: errMsg,
+            type: "error"
+          });
+          setLoading(false);
+          reject(new Error(errMsg));
+          return;
+        }
+
+        if (isJson) {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const content = e.target?.result as string;
+              const backupData = JSON.parse(content);
+              await sendRestorePayload(backupData);
+              resolve();
+            } catch (err: any) {
+              const errMsg = `Không thể đọc nội dung file sao lưu: ${err.message}`;
+              setAppAlert({
+                isOpen: true,
+                title: "Lỗi giải mã JSON",
+                message: errMsg,
+                type: "error"
+              });
+              setLoading(false);
+              reject(err);
+            }
+          };
+          reader.readAsText(file);
+        } else {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const data = new Uint8Array(e.target?.result as ArrayBuffer);
+              const workbook = XLSX.read(data, { type: "array" });
+              const backupData = parseXLSXBackup(workbook);
+              await sendRestorePayload(backupData);
+              resolve();
+            } catch (err: any) {
+              const errMsg = `Không thể đọc file Excel sao lưu: ${err.message}`;
+              setAppAlert({
+                isOpen: true,
+                title: "Lỗi giải mã Excel",
+                message: errMsg,
+                type: "error"
+              });
+              setLoading(false);
+              reject(err);
+            }
+          };
+          reader.readAsArrayBuffer(file);
+        }
+      } catch (err: any) {
+        setAppAlert({
+          isOpen: true,
+          title: "Lỗi phục hồi",
+          message: `Có lỗi xảy ra trong quá trình xử lý tệp tin: ${err.message}`,
+          type: "error"
+        });
         setLoading(false);
-        return;
+        reject(err);
       }
-
-      if (isJson) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            const content = e.target?.result as string;
-            const backupData = JSON.parse(content);
-            await sendRestorePayload(backupData);
-          } catch (err: any) {
-            alert(`[LỖI GIẢI MÃ JSON] Không thể đọc nội dung file sao lưu: ${err.message}`);
-            setLoading(false);
-          }
-        };
-        reader.readAsText(file);
-      } else {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          try {
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const workbook = XLSX.read(data, { type: "array" });
-            const backupData = parseXLSXBackup(workbook);
-            await sendRestorePayload(backupData);
-          } catch (err: any) {
-            alert(`[LỖI GIẢI MÃ EXCEL] Không thể đọc file Excel sao lưu: ${err.message}`);
-            setLoading(false);
-          }
-        };
-        reader.readAsArrayBuffer(file);
-      }
-    } catch (err: any) {
-      alert(`[LỖI PHỤC HỒI] Có lỗi xảy ra trong quá trình xử lý tệp tin: ${err.message}`);
-      setLoading(false);
-    }
+    });
   };
 
   const handleExportSim = (
@@ -1717,15 +1837,15 @@ export default function App() {
       link.click();
       document.body.removeChild(link);
     } else if (type === "pdf") {
-      // Create a temporary container for rendering the PDF layout cleanly
+      // Create a temporary container for rendering the PDF layout cleanly in Landscape
       const tempDiv = document.createElement("div");
       tempDiv.style.position = "absolute";
       tempDiv.style.left = "-9999px";
       tempDiv.style.top = "0";
-      tempDiv.style.width = "800px";
+      tempDiv.style.width = "1120px"; // Spacious horizontal layout for landscape orientation
       tempDiv.style.backgroundColor = "white";
       tempDiv.style.color = "black";
-      tempDiv.style.padding = "40px";
+      tempDiv.style.padding = "45px";
       tempDiv.style.fontFamily = "'Times New Roman', Times, serif";
       tempDiv.style.lineHeight = "1.4";
       tempDiv.style.boxSizing = "border-box";
@@ -1746,20 +1866,20 @@ export default function App() {
 
         <div style="text-align: center; margin-bottom: 25px;">
           <div style="font-size: 18px; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">${reportTitle}</div>
-          <div style="font-size: 11px; font-style: italic; color: #333;">Thời gian kết xuất báo cáo: ${new Date().toLocaleDateString("vi-VN")} lúc ${new Date().toLocaleTimeString("vi-VN")}</div>
+          <div style="font-size: 11px; font-style: italic; color: #333;">Thời gian kết xuất báo cáo: ${new Date().toLocaleDateString("vi-VN")} lúc ${new Date().toLocaleTimeString("vi-VN")} (Định dạng Trang Ngang / Landscape)</div>
         </div>
 
-        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10px;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10px; table-layout: auto;">
           <thead>
             <tr style="background-color: #f3f4f6;">
-              ${headers.map(h => `<th style="border: 1px solid #000; padding: 6px; font-weight: bold; text-align: center; text-transform: uppercase;">${h}</th>`).join("")}
+              ${headers.map(h => `<th style="border: 1px solid #000; padding: 6px 4px; font-weight: bold; text-align: center; text-transform: uppercase; font-size: 9px; white-space: normal; word-break: break-word;">${h}</th>`).join("")}
             </tr>
           </thead>
           <tbody>
             ${rows.map((row, rIdx) => `
               <tr style="background-color: ${rIdx % 2 === 1 ? '#fcfcfc' : '#ffffff'};">
                 ${row.map((cell, cIdx) => `
-                  <td style="border: 1px solid #000; padding: 6px; text-align: ${cIdx === 0 ? 'center' : 'left'};">
+                  <td style="border: 1px solid #000; padding: 6px 4px; text-align: ${cIdx === 0 ? 'center' : 'left'}; font-size: 9px; word-break: break-word; white-space: normal;">
                     ${cell !== null && cell !== undefined ? cell : ""}
                   </td>
                 `).join("")}
@@ -1799,7 +1919,7 @@ export default function App() {
       loadingToast.style.zIndex = "99999";
       loadingToast.style.fontSize = "13px";
       loadingToast.style.fontWeight = "bold";
-      loadingToast.innerText = "Đang xử lý và xuất tệp tin PDF...";
+      loadingToast.innerText = "Đang xử lý và xuất tệp tin PDF dạng trang ngang...";
       document.body.appendChild(loadingToast);
 
       // Render with html2canvas (scale 2 for retina crisps)
@@ -1810,8 +1930,8 @@ export default function App() {
       }).then((canvas) => {
         const imgData = canvas.toDataURL("image/jpeg", 1.0);
         
-        // Setup A4 dimensions (210 x 297 mm)
-        const pdf = new jsPDF("p", "mm", "a4");
+        // Setup A4 dimensions in landscape mode ("l", "mm", "a4") -> 297 x 210 mm
+        const pdf = new jsPDF("l", "mm", "a4");
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         
@@ -1832,7 +1952,7 @@ export default function App() {
           heightLeft -= pdfHeight;
         }
         
-        const downloadName = `${reportTitle.replace(/\s+/g, "_")}_2026.pdf`;
+        const downloadName = `${reportTitle.replace(/\s+/g, "_")}_Landscape_2026.pdf`;
         pdf.save(downloadName);
         
         document.body.removeChild(tempDiv);
@@ -1847,6 +1967,7 @@ export default function App() {
   };
 
   return (
+    <>
     <DeviceSimulator>
       {(isMobile, deviceType) => {
         
@@ -2150,16 +2271,7 @@ export default function App() {
                           <span>{googleLoading ? "Đang kết nối..." : "🔄 Admin Redirect Sign-in (Không dùng Popup)"}</span>
                         </button>
                         
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLoginRole(UserRole.SUPER_ADMIN);
-                            handleDemoBypass();
-                          }}
-                          className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black rounded-xl border border-emerald-500/30 shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer duration-200 active:scale-[0.98] text-[10px] uppercase tracking-wider animate-pulse"
-                        >
-                          <span>🔑 Admin Demo Bypass Sign-in (2FA) 🚀</span>
-                        </button>
+
                       </div>
 
                       <div className="pt-2 text-center border-t border-slate-900 flex flex-col items-center gap-1.5">
@@ -2313,13 +2425,7 @@ export default function App() {
                         <span>{googleLoading ? "Đang kết nối..." : "🔄 Đăng nhập Chuyển hướng (Không dùng Popup)"}</span>
                       </button>
                       
-                      <button
-                        type="button"
-                        onClick={handleDemoBypass}
-                        className="w-full py-2.5 px-3 text-[11px] font-black text-emerald-800 hover:text-white transition-all cursor-pointer text-center border border-emerald-600 rounded-xl bg-emerald-50 hover:bg-emerald-600 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] duration-150 uppercase"
-                      >
-                        <span>🔑 Đăng nhập nhanh Demo (Bypass IFrame) 🚀</span>
-                      </button>
+
                     </div>
 
                     <div className="pt-3 text-center border-t border-slate-100 flex flex-col items-center gap-1.5">
@@ -2747,6 +2853,42 @@ export default function App() {
                     </div>
                   )}
 
+                  {currentUser?.role === UserRole.SUPER_ADMIN && latestSecurityAlert && (
+                    <div className="bg-rose-50 border-b border-rose-200 px-4 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-xs animate-pulse-subtle">
+                      <div className="flex items-start gap-3">
+                        <div className="bg-rose-100 p-2 rounded-xl text-rose-800 shrink-0 border border-rose-200">
+                          <AlertTriangle className="w-5 h-5 text-rose-600 animate-bounce" />
+                        </div>
+                        <div>
+                          <h4 className="font-extrabold text-rose-900 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                            🚨 CẢNH BÁO BẢO MẬT HỆ THỐNG
+                          </h4>
+                          <p className="text-rose-700 text-xs mt-0.5 leading-relaxed font-semibold">
+                            {latestSecurityAlert.details} (Thời gian: {new Date(latestSecurityAlert.timestamp).toLocaleString("vi-VN")})
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <button
+                          onClick={() => setLatestSecurityAlert(null)}
+                          className="px-3 py-1.5 hover:bg-rose-100 text-rose-800 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        >
+                          Bỏ qua
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActiveTab("permissions");
+                            setLatestSecurityAlert(null);
+                          }}
+                          className="flex items-center gap-1.5 px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition-colors cursor-pointer uppercase tracking-wider"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          Xem & Phê duyệt
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {activeTab === "dashboard" && (
                     <DashboardView 
                       households={households} 
@@ -2901,5 +3043,40 @@ export default function App() {
         );
       }}
     </DeviceSimulator>
+    
+    {appAlert && appAlert.isOpen && (
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex justify-center items-center p-4 z-[99999]">
+        <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-slate-150 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div className="flex items-center gap-3">
+            {appAlert.type === "success" && (
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                <Check className="w-5 h-5" />
+              </div>
+            )}
+            {appAlert.type === "error" && (
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+            )}
+            {appAlert.type === "info" && (
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+            )}
+            <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">{appAlert.title}</h3>
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed font-medium whitespace-pre-line">{appAlert.message}</p>
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => setAppAlert(null)}
+              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+            >
+              Đồng ý
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

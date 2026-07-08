@@ -7,10 +7,12 @@ import React, { useState } from "react";
 import { 
   Home, Search, Plus, Edit, Trash2, MapPin, Eye, EyeOff, X, 
   Check, Camera, HelpCircle, FileSpreadsheet, Users, Download, Printer, Image, FileText,
-  Maximize2, Minimize2
+  Maximize2, Minimize2, QrCode
 } from "lucide-react";
 import { Household, HouseholdStatus, HousingType, User, UserRole, Resident, WaterSource, WasteCollectionStatus, Gender, ResidentStatus, EducationLevel, LaborSector } from "../types";
 import { CameraCaptureModal } from "./CameraCaptureModal";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import { CccdQrScannerModal } from "./CccdQrScannerModal";
 
 export enum HouseholdGenerationType {
   SINGLE_PARENT = "SINGLE_PARENT", // Chỉ có cha hoặc mẹ sống chung với con
@@ -139,6 +141,8 @@ export default function HouseholdView({
 }: HouseholdViewProps) {
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [householdToDelete, setHouseholdToDelete] = useState<{ id: string; ownerName: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [wasteFeeFilter, setWasteFeeFilter] = useState<string>("ALL");
   const [waterSourceFilter, setWaterSourceFilter] = useState<string>("ALL");
@@ -192,6 +196,7 @@ export default function HouseholdView({
   const [simulatingGps, setSimulatingGps] = useState(false);
   const [simulatingCamera, setSimulatingCamera] = useState(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
  
   // Filtered households
   const filteredHouseholds = households.filter(h => {
@@ -223,6 +228,35 @@ export default function HouseholdView({
     const matchesGeneration = generationFilter === "ALL" || genType === generationFilter;
     return matchesSearch && matchesStatus && matchesWasteFee && matchesWaterSource && matchesAgri && matchesNonAgriTax && matchesGeneration;
   });
+
+  const handleCccdScanSuccess = (data: {
+    cccd: string;
+    fullName: string;
+    birthDate: string;
+    gender: string;
+    address: string;
+  }) => {
+    setFormOwnerName(data.fullName);
+    setOwnerCccd(data.cccd);
+    setFormOwnerId(data.cccd);
+    setOwnerBirthDate(data.birthDate);
+    
+    if (data.gender === "Nam") {
+      setOwnerGender(Gender.MALE);
+    } else if (data.gender === "Nữ") {
+      setOwnerGender(Gender.FEMALE);
+    } else {
+      setOwnerGender(Gender.OTHER);
+    }
+    
+    setFormAddress(data.address);
+    setOwnerPermanentAddress(data.address);
+    
+    const matchWard = data.address.match(/Tổ\s+(\d+)/i);
+    if (matchWard) {
+      setFormWard(`Tổ ${matchWard[1]}`);
+    }
+  };
  
   // Handle open form
   const openAddForm = () => {
@@ -332,13 +366,51 @@ export default function HouseholdView({
     setIsFormOpen(true);
   };
 
+  // Map any coordinate into the Phường Bình Minh, Tây Ninh boundary
+  const mapToBinhMinh = (lat: number, lng: number) => {
+    const minLat = 11.330;
+    const maxLat = 11.365;
+    const minLng = 106.110;
+    const maxLng = 106.145;
+
+    // If already inside, keep it
+    if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+      return { lat, lng };
+    }
+
+    // Map other provinces/cities (e.g. HCMC ~10.7-10.8, Hanoi ~20.9-21.0, etc.)
+    // proportionally into our sector
+    let latPct = (lat % 0.1) / 0.1;
+    let lngPct = (lng % 0.1) / 0.1;
+
+    if (lat >= 10.0 && lat <= 11.5 && lng >= 106.0 && lng <= 107.0) {
+      latPct = (lat - 10.75) / 0.05;
+      lngPct = (lng - 106.68) / 0.04;
+    } else if (lat >= 20.5 && lat <= 21.5 && lng >= 105.5 && lng <= 106.5) {
+      latPct = (lat - 20.95) / 0.05;
+      lngPct = (lng - 105.78) / 0.05;
+    }
+
+    latPct = Math.min(Math.max(Math.abs(latPct) % 1.0, 0), 1);
+    lngPct = Math.min(Math.max(Math.abs(lngPct) % 1.0, 0), 1);
+
+    const finalLat = minLat + latPct * (maxLat - minLat);
+    const finalLng = minLng + lngPct * (maxLng - minLng);
+
+    return {
+      lat: parseFloat(finalLat.toFixed(6)),
+      lng: parseFloat(finalLng.toFixed(6))
+    };
+  };
+
   // GPS Simulation
   const handleSimulateGps = () => {
     setSimulatingGps(true);
     setTimeout(() => {
-      // Simulate GPS capture in Ho Chi Minh City
-      const lat = parseFloat((10.775 + Math.random() * 0.01).toFixed(6));
-      const lng = parseFloat((106.702 + Math.random() * 0.01).toFixed(6));
+      // Simulate GPS capture in Phường Bình Minh, Tây Ninh
+      const rawLat = 11.330 + Math.random() * 0.035;
+      const rawLng = 106.110 + Math.random() * 0.035;
+      const { lat, lng } = mapToBinhMinh(rawLat, rawLng);
       setFormGpsLat(lat);
       setFormGpsLng(lng);
       setSimulatingGps(false);
@@ -1062,9 +1134,8 @@ export default function HouseholdView({
 
                     <button
                       onClick={() => {
-                        if (confirm(`Bạn có chắc chắn muốn xoá hộ gia đình ${h.id} của ông/bà ${h.ownerName}? Hành động này sẽ không thể khôi phục.`)) {
-                          onDeleteHousehold(h.id);
-                        }
+                        setHouseholdToDelete({ id: h.id, ownerName: h.ownerName });
+                        setDeleteModalOpen(true);
                       }}
                       className="p-2.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                       title="Xoá hộ gia đình"
@@ -1107,7 +1178,7 @@ export default function HouseholdView({
                 <div>
                   <h4 className="font-semibold text-xs text-slate-400 uppercase tracking-wider mb-2">Định vị GPS & Thông tin địa chính</h4>
                   <div className="space-y-1.5 text-xs text-slate-600">
-                    <p><b>Phường/Xã:</b> Phường 22, Quận Bình Thạnh</p>
+                    <p><b>Phường/Xã:</b> Phường Bình Minh, Tây Ninh</p>
                     <p><b>Địa bàn:</b> {selectedHousehold.wardId}{selectedHousehold.quarterId ? ` • ${selectedHousehold.quarterId}` : ""}</p>
                     <p className="flex items-center gap-1">
                       <MapPin className="w-3.5 h-3.5 text-rose-500" />
@@ -1276,6 +1347,27 @@ export default function HouseholdView({
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {formMode === "add" && (
+                <div className="bg-emerald-50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-2xs mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl flex items-center justify-center shrink-0">
+                      <QrCode className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-emerald-900 uppercase tracking-wide">Nhập liệu nhanh bằng CCCD</p>
+                      <p className="text-[10px] text-emerald-700 font-medium">Quét QR hoặc tải ảnh để tự động điền mọi thông tin.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsQrModalOpen(true)}
+                    className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95 shrink-0"
+                  >
+                    <QrCode className="w-4 h-4" /> Quét QR CCCD
+                  </button>
+                </div>
+              )}
+
               <div className={`grid gap-4 ${isZoomed ? "grid-cols-2" : "grid-cols-1 md:grid-cols-2"}`}>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Mã hộ gia đình *</label>
@@ -1768,6 +1860,31 @@ export default function HouseholdView({
         isOpen={isCameraModalOpen}
         onClose={() => setIsCameraModalOpen(false)}
         onCapture={(dataUrl) => setFormPhoto(dataUrl)}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={deleteModalOpen && householdToDelete !== null}
+        title={`Xoá sổ hộ gia đình ${householdToDelete?.id}`}
+        description={`Bạn có chắc chắn muốn xoá vĩnh viễn sổ hộ gia đình của ông/bà ${householdToDelete?.ownerName}? Lưu ý: Hành động này không thể khôi phục.`}
+        confirmWord={householdToDelete?.ownerName || "XOÁ"}
+        placeholder={`Nhập tên chủ hộ '${householdToDelete?.ownerName}' để xác nhận`}
+        onConfirm={() => {
+          if (householdToDelete) {
+            onDeleteHousehold(householdToDelete.id);
+          }
+          setDeleteModalOpen(false);
+          setHouseholdToDelete(null);
+        }}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setHouseholdToDelete(null);
+        }}
+      />
+
+      <CccdQrScannerModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        onScanSuccess={handleCccdScanSuccess}
       />
     </div>
   );

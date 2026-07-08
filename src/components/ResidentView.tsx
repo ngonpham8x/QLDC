@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Resident, Gender, ResidentStatus, EducationLevel, LaborSector, User, UserRole, Household } from "../types";
 import { CameraCaptureModal } from "./CameraCaptureModal";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import { CccdQrScannerModal } from "./CccdQrScannerModal";
 
 interface ResidentViewProps {
   residents: Resident[];
@@ -50,6 +52,8 @@ export default function ResidentView({
 }: ResidentViewProps) {
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [residentToDelete, setResidentToDelete] = useState<{ id: string; fullName: string } | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "card">(isMobile ? "card" : "table");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [eduFilter, setEduFilter] = useState<string>("ALL");
@@ -62,6 +66,7 @@ export default function ResidentView({
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [scanningInProgress, setScanningInProgress] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Form Fields
   const [formId, setFormId] = useState(""); // CCCD / Personal ID
@@ -218,34 +223,74 @@ export default function ResidentView({
     setIsFormOpen(true);
   };
 
+  // Map any coordinate into the Phường Bình Minh, Tây Ninh boundary
+  const mapToBinhMinh = (lat: number, lng: number) => {
+    const minLat = 11.330;
+    const maxLat = 11.365;
+    const minLng = 106.110;
+    const maxLng = 106.145;
+
+    // If already inside, keep it
+    if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+      return { lat, lng };
+    }
+
+    // Map other provinces/cities (e.g. HCMC ~10.7-10.8, Hanoi ~20.9-21.0, etc.)
+    // proportionally into our sector
+    let latPct = (lat % 0.1) / 0.1;
+    let lngPct = (lng % 0.1) / 0.1;
+
+    if (lat >= 10.0 && lat <= 11.5 && lng >= 106.0 && lng <= 107.0) {
+      latPct = (lat - 10.75) / 0.05;
+      lngPct = (lng - 106.68) / 0.04;
+    } else if (lat >= 20.5 && lat <= 21.5 && lng >= 105.5 && lng <= 106.5) {
+      latPct = (lat - 20.95) / 0.05;
+      lngPct = (lng - 105.78) / 0.05;
+    }
+
+    latPct = Math.min(Math.max(Math.abs(latPct) % 1.0, 0), 1);
+    lngPct = Math.min(Math.max(Math.abs(lngPct) % 1.0, 0), 1);
+
+    const finalLat = minLat + latPct * (maxLat - minLat);
+    const finalLng = minLng + lngPct * (maxLng - minLng);
+
+    return {
+      lat: parseFloat(finalLat.toFixed(6)),
+      lng: parseFloat(finalLng.toFixed(6))
+    };
+  };
+
   // Scan GPS Coordinates (using browser API with reliable Vietnam-center simulated fallback)
   const handleScanGps = () => {
     setIsScanningGps(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setFormGpsLat(position.coords.latitude.toFixed(6));
-          setFormGpsLng(position.coords.longitude.toFixed(6));
+          const { lat, lng } = mapToBinhMinh(position.coords.latitude, position.coords.longitude);
+          setFormGpsLat(String(lat));
+          setFormGpsLng(String(lng));
           setIsScanningGps(false);
         },
         (error) => {
-          // Fallback to high-quality localized Vietnam ward/town coordinates
-          const randomLat = (20.9825 + (Math.random() - 0.5) * 0.005).toFixed(6);
-          const randomLng = (105.8142 + (Math.random() - 0.5) * 0.005).toFixed(6);
+          // Fallback to high-quality localized Phường Bình Minh, Tây Ninh coordinates
+          const rawLat = 11.330 + Math.random() * 0.035;
+          const rawLng = 106.110 + Math.random() * 0.035;
+          const { lat, lng } = mapToBinhMinh(rawLat, rawLng);
           setTimeout(() => {
-            setFormGpsLat(randomLat);
-            setFormGpsLng(randomLng);
+            setFormGpsLat(String(lat));
+            setFormGpsLng(String(lng));
             setIsScanningGps(false);
           }, 800);
         },
         { enableHighAccuracy: true, timeout: 5000 }
       );
     } else {
-      const randomLat = (20.9825 + (Math.random() - 0.5) * 0.005).toFixed(6);
-      const randomLng = (105.8142 + (Math.random() - 0.5) * 0.005).toFixed(6);
+      const rawLat = 11.330 + Math.random() * 0.035;
+      const rawLng = 106.110 + Math.random() * 0.035;
+      const { lat, lng } = mapToBinhMinh(rawLat, rawLng);
       setTimeout(() => {
-        setFormGpsLat(randomLat);
-        setFormGpsLng(randomLng);
+        setFormGpsLat(String(lat));
+        setFormGpsLng(String(lng));
         setIsScanningGps(false);
       }, 800);
     }
@@ -707,9 +752,8 @@ export default function ResidentView({
                           {currentUser?.role !== UserRole.COLLABORATOR && (
                             <button
                               onClick={() => {
-                                if (confirm(`Bạn có chắc muốn xoá cư dân ${r.fullName} khỏi sổ hộ tịch dân số?`)) {
-                                  onDeleteResident(r.id);
-                                }
+                                setResidentToDelete({ id: r.id, fullName: r.fullName });
+                                setDeleteModalOpen(true);
                               }}
                               className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                               title="Xoá bản ghi"
@@ -848,9 +892,8 @@ export default function ResidentView({
 
                       <button
                         onClick={() => {
-                          if (confirm(`Bạn có chắc muốn xoá cư dân ${r.fullName} khỏi sổ hộ tịch dân số?`)) {
-                            onDeleteResident(r.id);
-                          }
+                          setResidentToDelete({ id: r.id, fullName: r.fullName });
+                          setDeleteModalOpen(true);
                         }}
                         className="p-2.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                         title="Xoá bản ghi"
@@ -1573,6 +1616,25 @@ export default function ResidentView({
         isOpen={isCameraModalOpen}
         onClose={() => setIsCameraModalOpen(false)}
         onCapture={(dataUrl) => setFormPhotoUrl(dataUrl)}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={deleteModalOpen && residentToDelete !== null}
+        title={`Xoá thông tin nhân khẩu: ${residentToDelete?.fullName}`}
+        description={`Bạn có chắc chắn muốn xoá vĩnh viễn cư dân này khỏi hệ thống? Lưu ý: Hành động này không thể khôi phục.`}
+        confirmWord={residentToDelete?.fullName || "XOÁ"}
+        placeholder={`Nhập tên cư dân '${residentToDelete?.fullName}' để xác nhận`}
+        onConfirm={() => {
+          if (residentToDelete) {
+            onDeleteResident(residentToDelete.id);
+          }
+          setDeleteModalOpen(false);
+          setResidentToDelete(null);
+        }}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setResidentToDelete(null);
+        }}
       />
     </div>
   );

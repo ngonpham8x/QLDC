@@ -4,6 +4,7 @@ import {
   Eye, X, Check, Save, FolderOpen, AlertCircle, ShieldAlert 
 } from "lucide-react";
 import { QuarterDocument, UserRole } from "../types";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 interface QuarterDocumentsViewProps {
   currentUser: {
@@ -38,6 +39,10 @@ export default function QuarterDocumentsView({ currentUser }: QuarterDocumentsVi
 
   // Detail Modal state
   const [selectedDoc, setSelectedDoc] = useState<QuarterDocument | null>(null);
+
+  // Delete confirm modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<{ id: string; title: string } | null>(null);
 
   // Load documents
   const fetchDocuments = async () => {
@@ -257,10 +262,6 @@ export default function QuarterDocumentsView({ currentUser }: QuarterDocumentsVi
 
   // Delete document
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa tài liệu: "${title}"?`)) {
-      return;
-    }
-
     try {
       const queryParams = new URLSearchParams({
         user: currentUser.fullName,
@@ -482,7 +483,10 @@ Ban điều hành Tổ dân phố / Khu phố Ninh Phú
                     </button>
 
                     <button
-                      onClick={() => handleDelete(doc.id, doc.title)}
+                      onClick={() => {
+                        setDocToDelete({ id: doc.id, title: doc.title });
+                        setDeleteModalOpen(true);
+                      }}
                       className="p-2.5 text-rose-600 hover:bg-rose-50 rounded-xl border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
                       title="Xóa tài liệu"
                     >
@@ -702,7 +706,7 @@ Ban điều hành Tổ dân phố / Khu phố Ninh Phú
             </div>
 
             {/* Content */}
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[75vh]">
               <div className="space-y-2">
                 <span className="bg-emerald-50 text-emerald-800 border border-emerald-250 px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase">
                   {selectedDoc.category}
@@ -814,6 +818,25 @@ Ban điều hành Tổ dân phố / Khu phố Ninh Phú
           </div>
         </div>
       )}
+      {/* Confirm Delete Modal */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalOpen && docToDelete !== null}
+        title={`Xoá tài liệu lưu trữ: ${docToDelete?.title}`}
+        description={`Bạn có chắc chắn muốn xoá vĩnh viễn tài liệu này khỏi hồ sơ lưu trữ của tổ dân phố? Lưu ý: Hành động này không thể khôi phục.`}
+        confirmWord={docToDelete?.title || "XOÁ"}
+        placeholder={`Nhập tiêu đề tài liệu để xác nhận`}
+        onConfirm={() => {
+          if (docToDelete) {
+            handleDelete(docToDelete.id, docToDelete.title);
+          }
+          setDeleteModalOpen(false);
+          setDocToDelete(null);
+        }}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setDocToDelete(null);
+        }}
+      />
     </div>
   );
 }

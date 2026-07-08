@@ -10,6 +10,7 @@ import {
   Search, Filter, Trash2, Table, LayoutGrid, Upload, Database, RefreshCw, CheckCircle, FileJson
 } from "lucide-react";
 import { Household, Resident, BusinessHousehold, WasteCollectionStatus, WaterSource } from "../types";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 interface DashboardViewProps {
   households: Household[];
@@ -18,7 +19,7 @@ interface DashboardViewProps {
   onExport: (type: "xlsx" | "docx" | "pdf", entity: string, passedHeaders?: string[], passedRows?: any[][]) => void;
   isMobile: boolean;
   onGenerateMockData?: () => void;
-  onClearAllData?: () => void;
+  onClearAllData?: (bypassConfirm?: boolean) => void;
   onExportFullBackup?: () => void;
   onExportJSONBackup?: () => void;
   onRestoreBackup?: (file: File) => void;
@@ -45,6 +46,7 @@ export default function DashboardView({
   const [detSearch, setDetSearch] = React.useState("");
   const [viewMode, setViewMode] = React.useState<"table" | "cards">("table");
   const [showBackupTools, setShowBackupTools] = React.useState(false);
+  const [isClearAllModalOpen, setIsClearAllModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (isMobile) {
@@ -947,7 +949,7 @@ export default function DashboardView({
             </div>
             {onClearAllData && (
               <button
-                onClick={onClearAllData}
+                onClick={() => setIsClearAllModalOpen(true)}
                 className="px-4 py-2 bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-200 hover:text-rose-100 text-xs font-bold rounded-xl transition-colors shrink-0 cursor-pointer"
               >
                 Xoá sạch dữ liệu hệ thống
@@ -956,6 +958,22 @@ export default function DashboardView({
           </div>
         </div>
       )}
+
+      {/* Reusable Confirmation Modal to completely bypass window.confirm */}
+      <ConfirmDeleteModal
+        isOpen={isClearAllModalOpen}
+        title="Xoá sạch dữ liệu hệ thống"
+        description="CẢNH BÁO CỰC KỲ QUAN TRỌNG: Thao tác này sẽ xoá TOÀN BỘ dữ liệu hộ dân, nhân khẩu, biến động dân cư và hộ kinh doanh hiện có trong hệ thống để đưa hệ thống về trạng thái trống hoàn toàn, sẵn sàng cho nhập liệu thực tế. Hành động này không thể hoàn tác!"
+        confirmWord="XOÁ SẠCH"
+        placeholder="Nhập 'XOÁ SẠCH' để xác nhận hành động"
+        onConfirm={() => {
+          setIsClearAllModalOpen(false);
+          if (onClearAllData) {
+            onClearAllData(true);
+          }
+        }}
+        onCancel={() => setIsClearAllModalOpen(false)}
+      />
 
       {/* Spacer to prevent overlapping from the footer on shorter viewports */}
       <div className="h-24 sm:h-32 shrink-0 clear-both" />

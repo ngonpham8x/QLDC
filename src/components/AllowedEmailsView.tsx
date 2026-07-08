@@ -20,14 +20,15 @@ import {
 export default function AllowedEmailsView() {
   const [allowedEmails, setAllowedEmails] = useState<AllowedEmail[]>([]);
   const [pendingRegistrations, setPendingRegistrations] = useState<PendingRegistration[]>([]);
+  const [securityAlerts, setSecurityAlerts] = useState<any[]>([]);
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<UserRole>(UserRole.WARD_LEADER);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   
-  // Sub-tabs for approved list vs pending request list
-  const [subTab, setSubTab] = useState<"approved" | "pending">("approved");
+  // Sub-tabs for approved list, pending request list, and security alerts
+  const [subTab, setSubTab] = useState<"approved" | "pending" | "security">("approved");
 
   const fetchData = async () => {
     try {
@@ -49,6 +50,18 @@ export default function AllowedEmailsView() {
         const data = await resPending.json();
         setPendingRegistrations(data);
       }
+
+      // Fetch security alerts from system logs
+      const resLogs = await fetch("/api/logs");
+      if (resLogs.ok) {
+        const logsData = await resLogs.json();
+        const filtered = logsData.filter((log: any) => 
+          log.action?.includes("CẢNH BÁO") || 
+          log.action?.includes("Từ chối đăng nhập") ||
+          log.details?.includes("chưa được cấp quyền")
+        );
+        setSecurityAlerts(filtered);
+      }
     } catch (err) {
       setError("Có lỗi xảy ra khi kết nối máy chủ.");
     } finally {
@@ -59,6 +72,19 @@ export default function AllowedEmailsView() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleQuickApprove = (email: string) => {
+    setNewEmail(email);
+    setNewRole(UserRole.WARD_LEADER);
+    setSuccess(`Đã điền email "${email}". Vui lòng chọn vai trò và bấm "Cấp quyền ngay" bên trái.`);
+    // Scroll container or window to make it visible
+    const container = document.getElementById("allowed-emails-container");
+    if (container) {
+      container.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   const handleAddPermission = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,6 +330,19 @@ export default function AllowedEmailsView() {
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                 )}
               </button>
+              <button
+                onClick={() => setSubTab("security")}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  subTab === "security"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-rose-500 hover:text-rose-800"
+                }`}
+              >
+                Cảnh báo bảo mật ({securityAlerts.length})
+                {securityAlerts.length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                )}
+              </button>
             </div>
           </div>
 
@@ -369,7 +408,7 @@ export default function AllowedEmailsView() {
                   </tbody>
                 </table>
               )
-            ) : (
+            ) : subTab === "pending" ? (
               // Pending Sub-tab view
               pendingRegistrations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-xs text-center space-y-2">
@@ -442,6 +481,74 @@ export default function AllowedEmailsView() {
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              )
+            ) : (
+              // Security Alerts View
+              securityAlerts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-slate-400 text-xs text-center space-y-2">
+                  <ShieldCheck className="w-12 h-12 text-emerald-500/80" />
+                  <p className="font-bold text-slate-800">Hệ thống an toàn!</p>
+                  <p className="text-slate-500">Chưa ghi nhận nỗ lực truy cập trái phép hoặc cảnh báo bảo mật nào.</p>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-slate-400 font-bold uppercase text-[9px] tracking-wider bg-slate-50/50">
+                      <th className="py-3 px-4">Tài khoản & Thiết bị</th>
+                      <th className="py-3 px-4">Loại sự kiện</th>
+                      <th className="py-3 px-4">Chi tiết phát hiện</th>
+                      <th className="py-3 px-4">Thời gian</th>
+                      <th className="py-3 px-4 text-right">Phản ứng nhanh</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {securityAlerts.map((log) => {
+                      // Attempt to extract email from details or log userId
+                      let emailAttempt = log.userId || "";
+                      if (log.details && log.details.includes("Tài khoản Google")) {
+                        const match = log.details.match(/Tài khoản Google ([^\s]+)/);
+                        if (match && match[1]) {
+                          emailAttempt = match[1];
+                        }
+                      }
+                      return (
+                        <tr key={log.id} className="hover:bg-rose-50/20 transition-colors font-medium text-slate-700 bg-rose-50/5">
+                          <td className="py-3.5 px-4">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-slate-900">{log.userName || "Khách lạ"}</p>
+                              <span className="text-[10px] text-rose-600 font-mono flex items-center gap-1 font-semibold">
+                                <Mail className="w-3 h-3 text-rose-400" />
+                                {emailAttempt}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="px-2.5 py-1 rounded-full text-[9px] font-bold uppercase border bg-rose-50 text-rose-800 border-rose-200">
+                              CHẶN ĐĂNG NHẬP
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 max-w-[200px] break-words">
+                            <p className="text-[11px] leading-relaxed font-semibold text-rose-950">{log.details}</p>
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-500 font-mono text-[10px]">
+                            {new Date(log.timestamp).toLocaleDateString("vi-VN")}<br />
+                            {new Date(log.timestamp).toLocaleTimeString("vi-VN")}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <button
+                              onClick={() => handleQuickApprove(emailAttempt)}
+                              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-200/60 transition-all text-[11px] flex items-center gap-1.5 ml-auto hover:shadow-xs active:scale-95 duration-100 cursor-pointer"
+                              title="Tự động nhập email và cấp quyền hoạt động"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              Cấp quyền nhanh
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )

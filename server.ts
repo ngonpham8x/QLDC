@@ -1050,6 +1050,40 @@ function addLog(username: string, role: UserRole, action: string, details: strin
   saveToFirestore("logs", newLog);
 }
 
+// Security email warning alert simulation
+function sendEmailAlert(targetEmail: string, attemptedEmail: string, attemptedName: string) {
+  const timeStr = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+  console.log(`
+======================================================================
+🚨 [SECURITY ALERT] CẢNH BÁO ĐĂNG NHẬP TRÁI PHÉP HỆ THỐNG QUẢN LÝ DÂN CƯ 🚨
+======================================================================
+Gửi tới: ${targetEmail} (Người quản lý tối cao)
+Thời gian gửi email: ${timeStr}
+Chủ đề: [CẢNH BÁO BẢO MẬT] Phát hiện nỗ lực đăng nhập trái phép vào hệ thống!
+
+Kính gửi Ban Quản Trị Tổ dân phố / Khu phố Ninh Phú,
+
+Hệ thống bảo mật trực tuyến vừa phát hiện và ngăn chặn thành công một nỗ lực đăng nhập trái phép thông qua tài khoản Google Gmail.
+
+Thông tin chi tiết về cuộc đăng nhập:
+- Tài khoản Gmail cố gắng truy cập: ${attemptedEmail}
+- Họ và tên người dùng (Google Profile): ${attemptedName}
+- Thời gian phát hiện: ${timeStr}
+- Hành vi: Đăng nhập trực tiếp (Google Sign-In)
+- Trạng thái xử lý: ĐÃ CHẶN TRUY CẬP (ACCESS DENIED)
+
+Lưu ý: Tài khoản này chưa nằm trong danh sách email được cấp quyền (Allowed Emails). Hệ thống đã chặn toàn bộ quyền xem và thay đổi thông tin dữ liệu cư dân để bảo vệ bí mật đời tư công dân.
+
+Hành động khuyến nghị của bạn:
+1. Nếu đây là một cuộc xâm nhập cố ý từ người lạ: Vui lòng bỏ qua cảnh báo này và không chia sẻ bất kỳ thông tin nhạy cảm nào.
+2. Nếu đây là tài khoản mới của Cán bộ / Cộng tác viên thực tế: Bạn có thể đăng nhập vào ứng dụng bằng tài khoản Quản trị, chuyển đến tab "Cấp quyền truy cập" và nhập email "${attemptedEmail}" để chính thức cấp phép hoạt động cho họ.
+
+Trân trọng,
+Hệ Thống Giám Sát Cảnh Báo Tự Động Tổ Dân Phố Ninh Phú
+----------------------------------------------------------------------
+`);
+}
+
 // RESTful Express App Setup
 const app = express();
 app.use(express.json({ limit: "50mb" }));
@@ -1318,7 +1352,8 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
   }
 
   if (!finalRole) {
-    addLog(name || email, UserRole.COLLABORATOR, "Từ chối đăng nhập", `Tài khoản ${email} chưa được cấp quyền truy cập.`);
+    addLog(name || email, UserRole.COLLABORATOR, "CẢNH BÁO: Đăng nhập trái phép", `Tài khoản Google ${email} (Tên hiển thị: ${name || 'Chưa rõ'}) cố gắng đăng nhập hệ thống nhưng bị chặn do chưa được cấp quyền.`);
+    sendEmailAlert("BHTTQ3@gmail.com", email, name || "Cán bộ số");
     return res.send(`
       <html>
         <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f8fafc;">
@@ -1391,6 +1426,24 @@ app.post("/api/auth/log-google", (req, res) => {
   res.json({ success: true });
 });
 
+// Log unauthorized login attempt from client and simulate email alert
+app.post("/api/auth/unauthorized-attempt", (req, res) => {
+  const { email, displayName } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Thiếu thông tin email" });
+  }
+
+  addLog(
+    displayName || email,
+    UserRole.COLLABORATOR,
+    "CẢNH BÁO: Đăng nhập trái phép",
+    `Tài khoản Google ${email} (Tên hiển thị: ${displayName || 'Chưa rõ'}) cố gắng đăng nhập hệ thống nhưng bị chặn do chưa được cấp quyền.`
+  );
+  sendEmailAlert("BHTTQ3@gmail.com", email, displayName || "Cán bộ số");
+
+  res.json({ success: true, message: "Đã ghi nhận nỗ lực truy cập trái phép và gửi email cảnh báo bảo mật tới Quản trị viên." });
+});
+
 // Setup user on backend using Bearer token (IdToken)
 app.post("/api/users/setup", (req, res) => {
   const authHeader = req.headers.authorization;
@@ -1419,7 +1472,7 @@ app.post("/api/auth/login", (req, res) => {
 });
 
 // POST clear all data
-app.post("/api/data/clear-all", (req, res) => {
+app.post("/api/data/clear-all", async (req, res) => {
   const username = (req.query.user as string) || "Hệ thống";
   const userRole = (req.query.role as UserRole) || UserRole.SUPER_ADMIN;
 
@@ -1437,6 +1490,34 @@ app.post("/api/data/clear-all", (req, res) => {
 
   addLog(username, userRole, "Xoá tất cả dữ liệu", "Xoá toàn bộ dữ liệu mẫu/ảo thành công để chuẩn bị nhập dữ liệu thực tế");
   saveDatabase();
+
+  // If Firestore Cloud is active, clear/reset the Cloud database as well
+  if (firestoreDb) {
+    try {
+      console.log("Clearing Firestore collections...");
+      const collectionsToClear = ["households", "residents", "changes", "businesses", "criteria", "logs"];
+      for (const colName of collectionsToClear) {
+        const snap = await getDocs(collection(firestoreDb, colName));
+        const deletePromises = snap.docs.map(docSnap => deleteDoc(doc(firestoreDb, colName, docSnap.id)));
+        await Promise.all(deletePromises);
+      }
+
+      // Write reset criteria to Firestore
+      for (const critItem of db.criteria) {
+        await setDoc(doc(firestoreDb, "criteria", critItem.id), critItem);
+      }
+
+      // Write the clean audit log to Firestore
+      const cleanLogs = db.logs || [];
+      for (const logItem of cleanLogs) {
+        await setDoc(doc(firestoreDb, "logs", logItem.id), logItem);
+      }
+
+      console.log("Firestore Cloud cleared successfully.");
+    } catch (err: any) {
+      console.error("Lỗi khi xoá dữ liệu trên Firestore:", err);
+    }
+  }
 
   res.json({ success: true, message: "Đã xoá toàn bộ dữ liệu mẫu. Hệ thống trống sẵn sàng cho nhập liệu thực tế." });
 });
@@ -1905,6 +1986,151 @@ app.post("/api/data/generate-mock", (req, res) => {
     householdsCount: db.households.length,
     residentsCount: db.residents.length
   });
+});
+
+// GET Firestore Cloud status and item counts
+app.get("/api/data/firestore-status", (req, res) => {
+  try {
+    const configExists = fs.existsSync(firebaseConfigPath);
+    const databaseId = configExists 
+      ? JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8")).firestoreDatabaseId || "ai-studio-qunldnctdnph-da7c9d3e-909a-4207-ae73-55f5dd117cea"
+      : "Not configured";
+    const projectId = configExists
+      ? JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8")).projectId || "Unknown"
+      : "Not configured";
+
+    res.json({
+      connected: firestoreDb !== null,
+      databaseId,
+      projectId,
+      configPathExists: configExists,
+      localCounts: {
+        households: db.households?.length || 0,
+        residents: db.residents?.length || 0,
+        changes: db.changes?.length || 0,
+        businesses: db.businesses?.length || 0,
+        criteria: db.criteria?.length || 0,
+        logs: db.logs?.length || 0,
+        allowedEmails: db.allowedEmails?.length || 0,
+        pendingRegistrations: db.pendingRegistrations?.length || 0,
+        documents: db.documents?.length || 0,
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Lỗi kiểm tra trạng thái database: " + err.message });
+  }
+});
+
+// POST Synchronize Firestore Cloud with local memory (Pull or Push)
+app.post("/api/data/firestore-sync", async (req, res) => {
+  const direction = req.body.direction || "pull"; // "pull" or "push"
+  const username = (req.query.user as string) || "Hệ thống";
+  const userRole = (req.query.role as UserRole) || UserRole.SUPER_ADMIN;
+
+  if (!firestoreDb) {
+    return res.status(400).json({ error: "Firestore Cloud chưa được kích hoạt hoặc cấu hình." });
+  }
+
+  const collections = ["households", "residents", "changes", "businesses", "criteria", "logs", "allowedEmails", "pendingRegistrations", "documents"];
+
+  try {
+    if (direction === "pull") {
+      console.log("Forcing manual pull sync from Firestore Cloud...");
+      
+      const loadColl = async (name: string) => {
+        const snap = await getDocs(collection(firestoreDb, name));
+        const list: any[] = [];
+        snap.forEach(docSnap => {
+          list.push(docSnap.data());
+        });
+        return list;
+      };
+
+      const households = await loadColl("households");
+      const residents = await loadColl("residents");
+      const changes = await loadColl("changes");
+      const businesses = await loadColl("businesses");
+      const criteria = await loadColl("criteria");
+      const logs = await loadColl("logs");
+      const allowedEmails = await loadColl("allowedEmails");
+      const pendingRegistrations = await loadColl("pendingRegistrations");
+      const documents = await loadColl("documents");
+
+      // Verify if pulled data is non-empty
+      if (households.length > 0 || residents.length > 0 || changes.length > 0 || businesses.length > 0 || criteria.length > 0 || logs.length > 0 || allowedEmails.length > 0 || pendingRegistrations.length > 0 || documents.length > 0) {
+        db.households = households;
+        db.residents = residents;
+        db.changes = changes;
+        db.businesses = businesses;
+        if (criteria.length > 0) db.criteria = criteria as RuralCriteria[];
+        if (logs.length > 0) db.logs = logs as AuditLog[];
+        db.allowedEmails = allowedEmails as AllowedEmail[];
+        db.pendingRegistrations = pendingRegistrations as PendingRegistration[];
+        db.documents = documents as QuarterDocument[];
+
+        addLog(username, userRole, "Đồng bộ (Tải từ Cloud)", "Đồng bộ thủ công kéo dữ liệu mới nhất từ Firestore Cloud thành công.");
+        saveDatabase();
+        
+        return res.json({
+          success: true,
+          message: "Đồng bộ tải dữ liệu từ Firestore Cloud thành công!",
+          localCounts: {
+            households: db.households.length,
+            residents: db.residents.length,
+            changes: db.changes.length,
+            businesses: db.businesses.length,
+            criteria: db.criteria.length,
+            logs: db.logs.length,
+            allowedEmails: db.allowedEmails.length,
+            pendingRegistrations: db.pendingRegistrations.length,
+            documents: db.documents.length,
+          }
+        });
+      } else {
+        return res.status(404).json({ error: "Cơ sở dữ liệu trên Cloud hiện đang trống. Không có dữ liệu để đồng bộ xuống." });
+      }
+
+    } else if (direction === "push") {
+      console.log("Forcing manual push sync to Firestore Cloud...");
+
+      // Delete current firestore documents and write local ones
+      for (const key of collections) {
+        const snap = await getDocs(collection(firestoreDb, key));
+        const deletePromises = snap.docs.map(docSnap => deleteDoc(doc(firestoreDb, key, docSnap.id)));
+        await Promise.all(deletePromises);
+        
+        const items = (db as any)[key] || [];
+        for (const item of items) {
+          if (item && item.id) {
+            await setDoc(doc(firestoreDb, key, item.id), item);
+          }
+        }
+      }
+
+      addLog(username, userRole, "Đồng bộ (Đẩy lên Cloud)", "Đồng bộ thủ công ghi đè toàn bộ dữ liệu hiện có lên Firestore Cloud thành công.");
+      
+      return res.json({
+        success: true,
+        message: "Đồng bộ đẩy dữ liệu hiện tại lên Firestore Cloud thành công!",
+        localCounts: {
+          households: db.households.length,
+          residents: db.residents.length,
+          changes: db.changes.length,
+          businesses: db.businesses.length,
+          criteria: db.criteria.length,
+          logs: db.logs.length,
+          allowedEmails: db.allowedEmails.length,
+          pendingRegistrations: db.pendingRegistrations.length,
+          documents: db.documents.length,
+        }
+      });
+    } else {
+      return res.status(400).json({ error: "Hướng đồng bộ (direction) không hợp lệ." });
+    }
+  } catch (err: any) {
+    console.error("Manual Firestore synchronization failed:", err);
+    res.status(500).json({ error: "Thao tác đồng bộ thất bại: " + err.message });
+  }
 });
 
 // GET all households

@@ -129,14 +129,28 @@ export default function NewRuralView({
 
   // Convert GPS coordinate to custom SVG grid space for mock GIS
   const convertCoordsToSvg = (lat?: number, lng?: number) => {
-    // Default fallback bounds of our simulated neighborhood
-    const minLat = 10.775;
-    const maxLat = 10.795;
-    const minLng = 106.695;
-    const maxLng = 106.715;
+    // Default fallback bounds of our simulated neighborhood in Phường Bình Minh, Tây Ninh
+    const minLat = 11.330;
+    const maxLat = 11.365;
+    const minLng = 106.110;
+    const maxLng = 106.145;
 
-    const actualLat = lat || 10.7769;
-    const actualLng = lng || 106.7009;
+    let actualLat = lat || 11.3450;
+    let actualLng = lng || 106.1250;
+
+    // Handle old HCMC-bound mock coordinates and map them smoothly to Phường Bình Minh bounds
+    if (actualLat < 11.0 && actualLng > 106.5) {
+      const hcmcMinLat = 10.775;
+      const hcmcMaxLat = 10.795;
+      const hcmcMinLng = 106.695;
+      const hcmcMaxLng = 106.715;
+
+      const latPct = (actualLat - hcmcMinLat) / (hcmcMaxLat - hcmcMinLat);
+      const lngPct = (actualLng - hcmcMinLng) / (hcmcMaxLng - hcmcMinLng);
+
+      actualLat = minLat + latPct * (maxLat - minLat);
+      actualLng = minLng + lngPct * (maxLng - minLng);
+    }
 
     // Percentages
     const xPct = ((actualLng - minLng) / (maxLng - minLng)) * 100;
@@ -191,7 +205,7 @@ export default function NewRuralView({
         )}
 
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[10px] text-slate-500 leading-relaxed shrink-0">
-          <b>* Định hướng quy hoạch:</b> Mô-đun GIS giúp cán bộ Tổ trưởng phân loại phân bổ cứu trợ thiên tai cực đoan dựa theo địa hình cao độ vùng trũng sông Sài Gòn Thanh Đa.
+          <b>* Định hướng quy hoạch:</b> Mô-đun GIS giúp cán bộ Tổ trưởng phân loại phân bổ cứu trợ dựa theo dữ liệu thực địa bản đồ địa dư Phường Bình Minh, Tây Ninh.
         </div>
       </div>
     );
@@ -206,7 +220,7 @@ export default function NewRuralView({
             <Compass className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
             VỆ TINH GIS ĐỊA CHÍNH TỔ
           </p>
-          <p className="text-[9px] text-slate-400 mt-0.5 font-mono">Tọa độ trung tâm: 10.7769N, 106.7009E</p>
+          <p className="text-[9px] text-slate-400 mt-0.5 font-mono">Tọa độ trung tâm: 11.3450N, 106.1250E</p>
           
           {/* Interactive Tổ Selector */}
           <div className="flex items-center gap-1.5 mt-2 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 shadow-inner">
