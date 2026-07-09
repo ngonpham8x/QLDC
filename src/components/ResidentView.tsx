@@ -455,6 +455,29 @@ export default function ResidentView({
     }, 1500);
   };
 
+  const handleCccdScanSuccess = (data: {
+    cccd: string;
+    fullName: string;
+    birthDate: string;
+    gender: string;
+    address: string;
+  }) => {
+    setFormId(data.cccd);
+    setFormFullName(data.fullName);
+    setFormBirthDate(data.birthDate);
+    
+    if (data.gender === "Nam") {
+      setFormGender(Gender.MALE);
+    } else if (data.gender === "Nữ") {
+      setFormGender(Gender.FEMALE);
+    } else {
+      setFormGender(Gender.OTHER);
+    }
+    
+    setFormPermanentAddress(data.address);
+    setFormTemporaryAddress(data.address);
+  };
+
   const handleExport = (type: "xlsx" | "pdf") => {
     if (!onExport) return;
 
@@ -1185,6 +1208,27 @@ export default function ResidentView({
             )}
 
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs text-slate-600">
+              {formMode === "add" && (
+                <div className="bg-emerald-50 border border-emerald-100 p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-2xs mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-xl flex items-center justify-center shrink-0">
+                      <QrCode className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-emerald-900 uppercase tracking-wide">Nhập liệu nhanh bằng CCCD</p>
+                      <p className="text-[10px] text-emerald-700 font-medium">Quét QR hoặc tải ảnh để tự động điền mọi thông tin.</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsQrModalOpen(true)}
+                    className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95 shrink-0"
+                  >
+                    <QrCode className="w-4 h-4" /> Quét QR CCCD
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Họ và Tên khai sinh *</label>
@@ -1635,6 +1679,12 @@ export default function ResidentView({
           setDeleteModalOpen(false);
           setResidentToDelete(null);
         }}
+      />
+
+      <CccdQrScannerModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        onScanSuccess={handleCccdScanSuccess}
       />
     </div>
   );

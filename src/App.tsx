@@ -2416,14 +2416,7 @@ export default function App() {
                           <span>{googleLoading ? "Đang kết nối Google..." : "Xác thực bằng Google Gmail"}</span>
                         </div>
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleGoogleLoginRedirect}
-                        disabled={googleLoading}
-                        className="w-full py-2 px-3 text-[10px] font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer text-center border border-dashed border-slate-200 rounded-lg bg-slate-50/50 hover:bg-slate-50 flex items-center justify-center gap-1.5"
-                      >
-                        <span>{googleLoading ? "Đang kết nối..." : "🔄 Đăng nhập Chuyển hướng (Không dùng Popup)"}</span>
-                      </button>
+
                       
 
                     </div>
