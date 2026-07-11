@@ -2064,6 +2064,8 @@ export default function App() {
                         setExpected2FACode("");
                         setEntered2FACode("");
                         setLoginError("");
+                        localStorage.removeItem("currentUser");
+                        sessionStorage.removeItem("passed2FA");
                       }}
                       className="w-full py-2.5 bg-transparent border border-slate-850 hover:border-slate-800 text-slate-400 text-[11px] font-bold rounded-xl transition-all cursor-pointer"
                     >

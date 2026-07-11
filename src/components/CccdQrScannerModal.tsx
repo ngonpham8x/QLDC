@@ -29,6 +29,23 @@ const SAMPLE_CCCD_STRINGS = [
   }
 ];
 
+// Helper to boost image contrast in-place. Crucial for laminated, shiny CCCD cards.
+const boostContrast = (imageData: ImageData, factor: number = 2.0): ImageData => {
+  const data = imageData.data;
+  const len = data.length;
+  for (let i = 0; i < len; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    
+    // Contrast formula: (value - 128) * factor + 128 clamped to [0, 255]
+    data[i]     = Math.max(0, Math.min(255, Math.round((r - 128) * factor + 128)));
+    data[i + 1] = Math.max(0, Math.min(255, Math.round((g - 128) * factor + 128)));
+    data[i + 2] = Math.max(0, Math.min(255, Math.round((b - 128) * factor + 128)));
+  }
+  return imageData;
+};
+
 export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
   isOpen,
   onClose,
@@ -60,28 +77,64 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
   const startCamera = async () => {
     setIsLoading(true);
     setError(null);
-    try {
-      const constraints = {
+    
+    // Multi-tiered constraints list for maximum compatibility on all devices/browsers
+    const constraintOptions = [
+      {
         video: {
           facingMode: "environment",
-          width: { ideal: 640 },
-          height: { ideal: 480 }
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         },
-        audio: false,
-      };
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        audio: false
+      },
+      {
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      },
+      {
+        video: {
+          facingMode: "environment"
+        },
+        audio: false
+      },
+      {
+        video: true,
+        audio: false
+      }
+    ];
+
+    let mediaStream: MediaStream | null = null;
+    let lastError: any = null;
+
+    for (const constraints of constraintOptions) {
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (mediaStream) {
+          break; // Successfully opened a video stream!
+        }
+      } catch (err: any) {
+        console.warn("Camera constraint tried and failed:", constraints, err);
+        lastError = err;
+      }
+    }
+
+    if (mediaStream) {
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-    } catch (err: any) {
-      console.error("Camera access error:", err);
+    } else {
+      console.error("All camera constraints failed:", lastError);
       setError(
-        "Không thể mở Camera. Vui lòng cấp quyền sử dụng camera hoặc chuyển sang tab 'Tải ảnh lên' / 'Mô phỏng' để tiếp tục."
+        `Không thể kết nối Máy ảnh. Lỗi: ${lastError?.message || "Thiết bị không hỗ trợ"}. Vui lòng cấp quyền sử dụng camera hoặc chuyển sang tab 'Tải ảnh lên' / 'Mô phỏng' để tiếp tục.`
       );
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   const stopCamera = () => {
@@ -101,27 +154,68 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
     let animFrameId: number;
     const canvas = canvasRef.current || document.createElement("canvas");
     const ctx = canvas.getContext("2d");
+    let lastScanTime = 0;
 
     const scanFrame = () => {
       if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
         const video = videoRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        
+        // Downscale image to a max width of 1280px (HD) to keep details sharp for small CCCD QR codes
+        const maxScanWidth = 1280;
+        let scanWidth = video.videoWidth;
+        let scanHeight = video.videoHeight;
+        
+        if (video.videoWidth > maxScanWidth) {
+          scanWidth = maxScanWidth;
+          scanHeight = Math.round((maxScanWidth / video.videoWidth) * video.videoHeight);
+        }
+        
+        if (canvas.width !== scanWidth || canvas.height !== scanHeight) {
+          canvas.width = scanWidth;
+          canvas.height = scanHeight;
+        }
         
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert"
-          });
+          
+          const now = Date.now();
+          // Throttle jsQR scanning to once every 200ms to save CPU and maximize performance
+          if (now - lastScanTime > 200) {
+            lastScanTime = now;
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "attemptBoth"
+            });
 
-          if (code && code.data) {
-            const parsed = handleParseCccdString(code.data);
-            if (parsed) {
-              onScanSuccess(parsed);
-              stopCamera();
-              onClose();
-              return; // Stop scan loop
+            // Dual-pass: If raw scan failed, try with boosted contrast to cut through glare and reflection
+            if (!code) {
+              const boostedData = boostContrast(imageData, 2.5);
+              code = jsQR(boostedData.data, boostedData.width, boostedData.height, {
+                inversionAttempts: "attemptBoth"
+              });
+            }
+
+            if (code) {
+              // Decode UTF-8 correctly for Vietnamese characters
+              let qrText = code.data;
+              if (code.binaryData && code.binaryData.length > 0) {
+                try {
+                  const bytes = new Uint8Array(code.binaryData);
+                  qrText = new TextDecoder("utf-8").decode(bytes);
+                } catch (err) {
+                  console.warn("UTF-8 decoding failed, fallback to code.data", err);
+                }
+              }
+
+              if (qrText) {
+                const parsed = handleParseCccdString(qrText);
+                if (parsed) {
+                  onScanSuccess(parsed);
+                  stopCamera();
+                  onClose();
+                  return; // Stop scan loop
+                }
+              }
             }
           }
         }
@@ -135,21 +229,63 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
     };
   }, [stream, activeTab, isOpen]);
 
-  // CCCD QR parser
+  // Robust CCCD QR parser with smart field detection
   const handleParseCccdString = (qrString: string) => {
     if (!qrString || !qrString.includes("|")) {
       return null;
     }
 
     try {
-      const parts = qrString.split("|");
-      if (parts.length < 5) return null;
+      const parts = qrString.split("|").map(p => p.trim());
+      if (parts.length < 4) return null;
 
-      const cccd = parts[0]?.trim() || "";
-      const fullName = parts[2]?.trim() || "";
-      const rawBirth = parts[3]?.trim() || ""; // DDMMYYYY
-      const rawGender = parts[4]?.trim() || "Nam";
-      const address = parts[5]?.trim() || "";
+      const cccd = parts[0] || "";
+      let fullName = "";
+      let rawBirth = "";
+      let rawGender = "Nam";
+      let address = "";
+
+      const isNumeric = (str: string) => /^\d+$/.test(str);
+
+      // Smart detection of fields:
+      // Standard Format: [0] CCCD | [1] Old ID (empty/number) | [2] FullName | [3] DOB (8 digits) | [4] Gender | [5] Address
+      // If [1] contains alphabet characters, then Old ID is omitted entirely, making [1] the FullName.
+      if (parts[1] === "" || (parts[1] && isNumeric(parts[1]) && parts[1].length === 9)) {
+        fullName = parts[2] || "";
+        rawBirth = parts[3] || "";
+        rawGender = parts[4] || "Nam";
+        address = parts[5] || "";
+      } else {
+        fullName = parts[1] || "";
+        rawBirth = parts[2] || "";
+        rawGender = parts[3] || "Nam";
+        address = parts[4] || "";
+      }
+
+      // Deep fallback lookup: find DOB by 8-digit numeric criteria if standard parsing failed
+      if (!fullName || !rawBirth || rawBirth.length !== 8 || !isNumeric(rawBirth)) {
+        const dobIndex = parts.findIndex(p => p.length === 8 && isNumeric(p));
+        if (dobIndex !== -1) {
+          rawBirth = parts[dobIndex];
+          if (dobIndex > 0) {
+            fullName = parts[dobIndex - 1];
+          }
+          if (dobIndex + 1 < parts.length) {
+            const possibleGender = parts[dobIndex + 1];
+            if (possibleGender.toLowerCase() === "nam" || possibleGender.toLowerCase() === "nữ") {
+              rawGender = possibleGender;
+            }
+          }
+          if (dobIndex + 2 < parts.length) {
+            address = parts[dobIndex + 2];
+          }
+        }
+      }
+
+      // Minimum requirements validation
+      if (!cccd || !fullName) {
+        return null;
+      }
 
       // Format birthdate from DDMMYYYY to YYYY-MM-DD
       let birthDate = "";
@@ -197,16 +333,39 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
         if (ctx) {
           ctx.drawImage(img, 0, 0);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          let code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "attemptBoth"
+          });
           
-          if (code && code.data) {
-            const parsed = handleParseCccdString(code.data);
-            if (parsed) {
-              onScanSuccess(parsed);
-              onClose();
-            } else {
-              setStatusMessage("Tìm thấy QR Code nhưng nội dung không đúng định dạng CCCD Việt Nam.");
+          // Dual-pass: If raw scan failed, try with boosted contrast to cut through shadows/glare
+          if (!code) {
+            const boostedData = boostContrast(imageData, 2.5);
+            code = jsQR(boostedData.data, boostedData.width, boostedData.height, {
+              inversionAttempts: "attemptBoth"
+            });
+          }
+          
+          if (code) {
+            // Decode UTF-8 correctly for Vietnamese characters
+            let qrText = code.data;
+            if (code.binaryData && code.binaryData.length > 0) {
+              try {
+                const bytes = new Uint8Array(code.binaryData);
+                qrText = new TextDecoder("utf-8").decode(bytes);
+              } catch (err) {
+                console.warn("UTF-8 decoding failed, fallback to code.data", err);
+              }
             }
+
+            if (qrText) {
+              const parsed = handleParseCccdString(qrText);
+              if (parsed) {
+                onScanSuccess(parsed);
+                onClose();
+                return;
+              }
+            }
+            setStatusMessage("Tìm thấy QR Code nhưng nội dung không đúng định dạng CCCD Việt Nam hoặc dữ liệu bị lỗi.");
           } else {
             setStatusMessage("Không phát hiện thấy QR Code nào trong bức ảnh này. Vui lòng thử ảnh chụp rõ hơn.");
           }
