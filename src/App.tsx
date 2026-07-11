@@ -37,8 +37,7 @@ export default function App() {
   const { user, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
     const saved = localStorage.getItem("currentUser");
-    const passed2FA = sessionStorage.getItem("passed2FA");
-    if (saved && passed2FA === "true") {
+    if (saved) {
       try {
         const parsed = JSON.parse(saved);
         return parsed;
@@ -151,27 +150,8 @@ export default function App() {
             phone: user.phoneNumber || "0900000000"
           };
 
-          // If they are already in local storage as current logged in user and passed 2FA in this session, don't trigger 2FA again on reload
-          const savedStr = localStorage.getItem("currentUser");
-          const passed2FA = sessionStorage.getItem("passed2FA");
-          if (savedStr && passed2FA === "true") {
-            try {
-              const saved = JSON.parse(savedStr);
-              if (saved && saved.id === potentialUser.id) {
-                setCurrentUser(potentialUser);
-                setLoginError("");
-                return;
-              }
-            } catch {}
-          }
-
-          // Otherwise, trigger the 2FA dual-factor verification layer!
-          setPendingUser2FA(potentialUser);
-          if (!expected2FACode) {
-            const code = Math.floor(100000 + Math.random() * 900000).toString();
-            setExpected2FACode(code);
-            console.log(`[SECURE 2FA] Mã xác thực 2 lớp Google Auth: ${code}`);
-          }
+          setCurrentUser(potentialUser);
+          localStorage.setItem("currentUser", JSON.stringify(potentialUser));
           setLoginError("");
         } else {
           setLoginError(`Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`);
@@ -609,9 +589,8 @@ export default function App() {
       }
       const data = await res.json();
       
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setExpected2FACode(code);
-      setPendingUser2FA(data.user);
+      setCurrentUser(data.user);
+      localStorage.setItem("currentUser", JSON.stringify(data.user));
       setLoginError("");
     } catch (err: any) {
       setLoginError(err.message || "Lỗi đăng nhập.");
@@ -711,9 +690,8 @@ export default function App() {
       }
       const data = await res.json();
       
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setExpected2FACode(code);
-      setPendingUser2FA(data.user);
+      setCurrentUser(data.user);
+      localStorage.setItem("currentUser", JSON.stringify(data.user));
       setLoginError("");
       setOtpMode(false);
       setOtpCode("");
