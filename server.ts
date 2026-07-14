@@ -1459,16 +1459,24 @@ app.post("/api/users/setup", (req, res) => {
 
 // Mock Auth endpoint
 app.post("/api/auth/login", (req, res) => {
-  const { username } = req.body;
+  const { role } = req.body;
+  const userRole = role || UserRole.SUPER_ADMIN;
   
-  if (username === "BHTTQ3@gmail.com" || username === "admin") {
-    addLog("BHTTQ3@gmail.com", UserRole.SUPER_ADMIN, "Đăng nhập", "Đăng nhập thành công bằng tài khoản quản lý tối cao");
-    return res.json({
-      user: { id: "admin-id", username: "BHTTQ3@gmail.com", fullName: "Người quản lý", role: UserRole.SUPER_ADMIN, phone: "0999999999" }
-    });
+  let targetEmail = "BHTTQ3@gmail.com";
+  let fullName = "Người quản lý (Admin)";
+  
+  if (userRole === UserRole.WARD_LEADER) {
+    targetEmail = "truongkp@gmail.com";
+    fullName = "Cán bộ Trưởng Khu Phố";
+  } else if (userRole === UserRole.COLLABORATOR) {
+    targetEmail = "ctv@gmail.com";
+    fullName = "Cộng tác viên cơ sở";
   }
 
-  return res.status(401).json({ error: "Chỉ người quản lý tối cao mới được quyền đăng nhập." });
+  addLog(targetEmail, userRole, "Đăng nhập", `Đăng nhập thử nghiệm thành công với vai trò ${userRole}`);
+  return res.json({
+    user: { id: "demo-" + userRole.toLowerCase(), username: targetEmail, fullName, role: userRole, phone: "0999999999" }
+  });
 });
 
 // GET session and authorization check for real-time revoke/update
@@ -1480,9 +1488,16 @@ app.get("/api/auth/session-check", (req, res) => {
 
   const lowerEmail = (email as string).toLowerCase().trim();
 
-  // Special system user that is always allowed
-  if (lowerEmail === "bhttq3@gmail.com" || lowerEmail === "admin") {
+  // Special system users that are always allowed for testing/production
+  const systemAdmins = ["bhttq3@gmail.com", "tayninhdoimoi@gmail.com", "nguyentanbinh3005@gmail.com", "admin"];
+  if (systemAdmins.includes(lowerEmail)) {
     return res.json({ allowed: true, role: UserRole.SUPER_ADMIN });
+  }
+  if (lowerEmail === "truongkp@gmail.com") {
+    return res.json({ allowed: true, role: UserRole.WARD_LEADER });
+  }
+  if (lowerEmail === "ctv@gmail.com") {
+    return res.json({ allowed: true, role: UserRole.COLLABORATOR });
   }
 
   if (!db.allowedEmails) db.allowedEmails = [];

@@ -133,6 +133,9 @@ export default function App() {
   // Synchronize Google login session with local currentUser state
   useEffect(() => {
     const checkUserAccess = async () => {
+      if (sessionStorage.getItem("explicit_logout") === "true") {
+        return;
+      }
       if (user) {
         const email = user.email || "";
         const displayName = user.displayName || email || "Cán bộ số";
@@ -229,6 +232,7 @@ export default function App() {
           const data = await res.json();
           if (!data.allowed) {
             // User was removed or is not allowed anymore! Kick them immediately!
+            sessionStorage.setItem("explicit_logout", "true");
             setCurrentUser(null);
             setPendingUser2FA(null);
             localStorage.removeItem("currentUser");
@@ -524,6 +528,7 @@ export default function App() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleGoogleLogin = async () => {
+    sessionStorage.removeItem("explicit_logout");
     setGoogleLoading(true);
     setLoginError("");
     try {
@@ -633,6 +638,7 @@ export default function App() {
   };
 
   const handleGoogleLoginRedirect = async () => {
+    sessionStorage.removeItem("explicit_logout");
     setGoogleLoading(true);
     setLoginError("");
     try {
@@ -646,12 +652,12 @@ export default function App() {
     }
   };
 
-  const handleDemoBypass = async () => {
+  const handleDemoBypass = async (role?: UserRole) => {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: "BHTTQ3@gmail.com" })
+        body: JSON.stringify({ role: role || loginRole })
       });
       if (!res.ok) {
         const err = await res.json();
@@ -659,6 +665,7 @@ export default function App() {
       }
       const data = await res.json();
       
+      sessionStorage.setItem("passed2FA", "true");
       setCurrentUser(data.user);
       localStorage.setItem("currentUser", JSON.stringify(data.user));
       setLoginError("");
@@ -719,6 +726,7 @@ export default function App() {
   // Handle actual phone login with OTP
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    sessionStorage.removeItem("explicit_logout");
     if (!loginPhone.match(/^0[0-9]{9}$/)) {
       setLoginError("Số điện thoại không hợp lệ! Vui lòng nhập định dạng 10 số (ví dụ: 0901234567).");
       return;
@@ -747,6 +755,7 @@ export default function App() {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    sessionStorage.removeItem("explicit_logout");
     setLoginError("");
     try {
       const res = await fetch("/api/auth/login", {
@@ -782,6 +791,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    sessionStorage.setItem("explicit_logout", "true");
     if (user) {
       try {
         await contextLogout();
@@ -2167,13 +2177,21 @@ export default function App() {
 
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        sessionStorage.setItem("explicit_logout", "true");
                         setPendingUser2FA(null);
                         setExpected2FACode("");
                         setEntered2FACode("");
                         setLoginError("");
                         localStorage.removeItem("currentUser");
                         sessionStorage.removeItem("passed2FA");
+                        if (user) {
+                          try {
+                            await contextLogout();
+                          } catch (err) {
+                            console.error("Failed to sign out Google user", err);
+                          }
+                        }
                       }}
                       className="w-full py-2.5 bg-transparent border border-slate-850 hover:border-slate-800 text-slate-400 text-[11px] font-bold rounded-xl transition-all cursor-pointer"
                     >
@@ -2380,8 +2398,6 @@ export default function App() {
                         >
                           <span>{googleLoading ? "Đang kết nối..." : "🔄 Admin Redirect Sign-in (Không dùng Popup)"}</span>
                         </button>
-                        
-
                       </div>
 
                       <div className="pt-2 text-center border-t border-slate-900 flex flex-col items-center gap-1.5">
@@ -2526,9 +2542,6 @@ export default function App() {
                           <span>{googleLoading ? "Đang kết nối Google..." : "Xác thực bằng Google Gmail"}</span>
                         </div>
                       </button>
-
-                      
-
                     </div>
 
                     <div className="pt-3 text-center border-t border-slate-100 flex flex-col items-center gap-1.5">

@@ -325,9 +325,16 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
           scannerRef.current = html5QrCodeInstance;
 
           const config = {
-            fps: 15, // Tốc độ khung hình/giây. 15-20 là lý tưởng.
-            qrbox: { width: 250, height: 250 }, // Khung vuông lấy nét
-            aspectRatio: 1.0 // Giữ tỷ lệ khung hình chuẩn
+            fps: 30, // Tăng fps lên 30 để nhận diện siêu nhanh, mượt mà
+            qrbox: (width: number, height: number) => {
+              // Tăng diện tích nhận diện lên 85% để dễ bắt mã QR hơn, không cần căn chỉnh quá khít
+              const size = Math.min(width, height) * 0.85;
+              return { width: size, height: size };
+            },
+            aspectRatio: 1.0, // Giữ tỷ lệ khung hình chuẩn
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true // Tự động dùng phần cứng quét siêu tốc nếu trình duyệt hỗ trợ
+            }
           };
 
           // Ưu tiên sử dụng camera sau (environment)
