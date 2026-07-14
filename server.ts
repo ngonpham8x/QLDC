@@ -1471,6 +1471,30 @@ app.post("/api/auth/login", (req, res) => {
   return res.status(401).json({ error: "Chỉ người quản lý tối cao mới được quyền đăng nhập." });
 });
 
+// GET session and authorization check for real-time revoke/update
+app.get("/api/auth/session-check", (req, res) => {
+  const { email } = req.query;
+  if (!email) {
+    return res.status(400).json({ error: "Email query parameter is required" });
+  }
+
+  const lowerEmail = (email as string).toLowerCase().trim();
+
+  // Special system user that is always allowed
+  if (lowerEmail === "bhttq3@gmail.com" || lowerEmail === "admin") {
+    return res.json({ allowed: true, role: UserRole.SUPER_ADMIN });
+  }
+
+  if (!db.allowedEmails) db.allowedEmails = [];
+  
+  const allowedUser = db.allowedEmails.find(a => a.email.toLowerCase() === lowerEmail);
+  if (!allowedUser) {
+    return res.json({ allowed: false });
+  }
+
+  return res.json({ allowed: true, role: allowedUser.role });
+});
+
 // POST clear all data
 app.post("/api/data/clear-all", async (req, res) => {
   const username = (req.query.user as string) || "Hệ thống";
@@ -3188,6 +3212,34 @@ app.delete("/api/allowed-emails/:email", (req, res) => {
     deleteFromFirestore("allowedEmails", deleted.id);
     addLog(req.query.user as string || "Người quản lý", UserRole.SUPER_ADMIN, "Hủy quyền truy cập", `Hủy quyền truy cập của email ${lowerEmail}`);
     res.json({ message: "Đã hủy quyền thành công", deleted });
+  } else {
+    res.status(404).json({ error: "Không tìm thấy email trong danh sách được cấp quyền" });
+  }
+});
+
+// PUT update allowed email role
+app.put("/api/allowed-emails/:email", (req, res) => {
+  const { email } = req.params;
+  const { role } = req.body;
+  
+  if (!email || !role) {
+    return res.status(400).json({ error: "Email và Vai trò là bắt buộc" });
+  }
+
+  if (!db.allowedEmails) db.allowedEmails = [];
+  
+  const lowerEmail = email.toLowerCase().trim();
+  const allowedUser = db.allowedEmails.find(a => a.email.toLowerCase() === lowerEmail);
+  
+  if (allowedUser) {
+    const oldRole = allowedUser.role;
+    allowedUser.role = role as UserRole;
+    allowedUser.assignedAt = new Date().toISOString();
+    saveDatabase();
+    saveToFirestore("allowedEmails", allowedUser);
+    
+    addLog(req.query.user as string || "Người quản lý", UserRole.SUPER_ADMIN, "Cập nhật quyền truy cập", `Cập nhật vai trò của email ${lowerEmail} từ ${oldRole} thành ${role}`);
+    res.json(allowedUser);
   } else {
     res.status(404).json({ error: "Không tìm thấy email trong danh sách được cấp quyền" });
   }

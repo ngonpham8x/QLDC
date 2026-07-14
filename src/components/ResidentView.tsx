@@ -23,6 +23,7 @@ interface ResidentViewProps {
   onDeleteResident: (id: string) => void;
   onExport?: (type: "xlsx" | "pdf", title: string, headers: string[], rows: any[][]) => void;
   isMobile?: boolean;
+  existingEntityIds?: Set<string>;
 }
 
 const getAge = (birthDateStr: string) => {
@@ -48,7 +49,7 @@ const formatDate = (dateStr?: string) => {
 };
 
 export default function ResidentView({
-  residents, households, currentUser, onAddResident, onUpdateResident, onDeleteResident, onExport, isMobile = false
+  residents, households, currentUser, onAddResident, onUpdateResident, onDeleteResident, onExport, isMobile = false, existingEntityIds
 }: ResidentViewProps) {
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -556,7 +557,7 @@ export default function ResidentView({
             </>
           )}
 
-          {currentUser?.role !== UserRole.COLLABORATOR && (
+          {true && (
             <>
               <button
                 onClick={() => {
@@ -763,7 +764,7 @@ export default function ResidentView({
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {currentUser?.role !== UserRole.COLLABORATOR && (
+                          {(currentUser?.role !== UserRole.COLLABORATOR || !existingEntityIds?.has(r.id)) && (
                             <button
                               onClick={() => openEditForm(r)}
                               className="p-1 text-slate-400 hover:text-blue-600 transition-colors cursor-pointer"
@@ -772,7 +773,7 @@ export default function ResidentView({
                               <Edit className="w-4 h-4" />
                             </button>
                           )}
-                          {currentUser?.role !== UserRole.COLLABORATOR && (
+                          {(currentUser?.role !== UserRole.COLLABORATOR || !existingEntityIds?.has(r.id)) && (
                             <button
                               onClick={() => {
                                 setResidentToDelete({ id: r.id, fullName: r.fullName });
@@ -903,7 +904,7 @@ export default function ResidentView({
                     Hồ sơ
                   </button>
 
-                  {currentUser?.role !== UserRole.COLLABORATOR && (
+                  {(currentUser?.role !== UserRole.COLLABORATOR || !existingEntityIds?.has(r.id)) && (
                     <>
                       <button
                         onClick={() => openEditForm(r)}

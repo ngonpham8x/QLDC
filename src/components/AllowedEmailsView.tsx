@@ -14,7 +14,8 @@ import {
   Phone, 
   FileText, 
   UserCheck, 
-  HelpCircle 
+  HelpCircle,
+  Edit
 } from "lucide-react";
 
 export default function AllowedEmailsView() {
@@ -26,6 +27,38 @@ export default function AllowedEmailsView() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [editingEmail, setEditingEmail] = useState<AllowedEmail | null>(null);
+  const [editingRole, setEditingRole] = useState<UserRole>(UserRole.WARD_LEADER);
+
+  const handleStartEditRole = (allowed: AllowedEmail) => {
+    setEditingEmail(allowed);
+    setEditingRole(allowed.role);
+  };
+
+  const handleSaveRole = async () => {
+    if (!editingEmail) return;
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch(`/api/allowed-emails/${encodeURIComponent(editingEmail.email)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: editingRole })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Không thể cập nhật vai trò.");
+      }
+
+      setAllowedEmails(allowedEmails.map(a => a.email === editingEmail.email ? { ...a, role: editingRole } : a));
+      setSuccess(`Đã cập nhật vai trò của tài khoản ${editingEmail.email} thành công!`);
+      setEditingEmail(null);
+    } catch (err: any) {
+      setError(err.message || "Lỗi khi cập nhật vai trò.");
+    }
+  };
   
   // Sub-tabs for approved list, pending request list, and security alerts
   const [subTab, setSubTab] = useState<"approved" | "pending" | "security">("approved");
@@ -396,6 +429,13 @@ export default function AllowedEmailsView() {
                         </td>
                         <td className="py-3.5 px-4 text-right">
                           <button
+                            onClick={() => handleStartEditRole(allowed)}
+                            className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-blue-100 mr-1"
+                            title="Sửa vai trò"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleRevokePermission(allowed.email)}
                             className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-rose-100"
                             title="Hủy quyền truy cập"
@@ -556,6 +596,74 @@ export default function AllowedEmailsView() {
           </div>
         </div>
       </div>
+      
+      {/* Modal Sửa Quyền */}
+      {editingEmail && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-blue-50 text-blue-700 rounded-xl flex items-center justify-center border border-blue-100">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <h3 className="font-extrabold text-slate-950 text-xs uppercase tracking-wider">
+                  Sửa quyền truy cập
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingEmail(null)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 rounded-lg hover:bg-slate-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Địa chỉ Email Gmail
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={editingEmail.email}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-500 bg-slate-100 font-semibold cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Chọn vai trò phân quyền mới
+                </label>
+                <select
+                  value={editingRole}
+                  onChange={(e) => setEditingRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 bg-slate-50/50 focus:bg-white focus:outline-blue-600 font-semibold cursor-pointer"
+                >
+                  <option value={UserRole.WARD_LEADER}>Trưởng khu phố (WARD_LEADER)</option>
+                  <option value={UserRole.COLLABORATOR}>Cộng tác viên (COLLABORATOR)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3">
+              <button
+                onClick={() => setEditingEmail(null)}
+                className="px-4 py-2 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleSaveRole}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer transition-all shadow-md active:scale-95"
+              >
+                Cập nhật vai trò
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

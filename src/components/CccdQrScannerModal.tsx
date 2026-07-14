@@ -767,57 +767,60 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
                 </div>
               )}
               
-              {/* Show reader camera only when there's no scannedResult */}
-              {!scannedResult && (
-                <div className="relative bg-slate-950 aspect-video rounded-2xl overflow-hidden shadow-inner border border-slate-800 flex items-center justify-center">
-                  {isLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-3 z-10 bg-slate-950/80">
-                      <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
-                      <p className="text-xs font-semibold text-slate-300">Đang kích hoạt máy ảnh...</p>
-                    </div>
-                  )}
+              {/* Show reader camera always mounted to prevent play() interruption, but hide via style when there's scannedResult */}
+              <div 
+                className="relative bg-slate-950 aspect-video rounded-2xl overflow-hidden shadow-inner border border-slate-800 flex items-center justify-center"
+                style={{ display: scannedResult ? 'none' : 'flex' }}
+              >
+                {isLoading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-3 z-10 bg-slate-950/80">
+                    <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
+                    <p className="text-xs font-semibold text-slate-300">Đang kích hoạt máy ảnh...</p>
+                  </div>
+                )}
 
-                  {error ? (
-                    <div className="p-6 text-center text-white flex flex-col items-center gap-3 z-10">
-                      <AlertCircle className="w-10 h-10 text-rose-500" />
-                      <p className="text-xs font-semibold text-slate-300 max-w-sm leading-relaxed">{error}</p>
-                      <button
-                        type="button"
-                        onClick={() => startScanner()}
-                        className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition cursor-pointer active:scale-95"
-                      >
-                        Thử lại
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {activeEngine === "native" ? (
-                        <video
-                          id="video"
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className="w-full h-full object-cover rounded-2xl"
-                        />
-                      ) : (
-                        <div id="reader" className="w-full h-full" />
-                      )}
-                      
-                      {/* Scanner scanning overlay line effect */}
-                      {!isLoading && scannerActive && (
-                        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-44 border-2 border-emerald-500/60 rounded-xl flex items-center justify-center pointer-events-none z-10">
-                          {/* Red flashing line */}
-                          <div className="absolute left-0 right-0 h-[2px] bg-red-500 shadow-md shadow-red-500/50 animate-pulse"></div>
-                          <span className="absolute bottom-2 text-[10px] bg-slate-900/85 px-3 py-1 rounded-full text-emerald-400 font-bold tracking-wider">
-                            ĐƯA QUÉT QR CCCD VÀO KHUNG
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
+                {error ? (
+                  <div className="p-6 text-center text-white flex flex-col items-center gap-3 z-10">
+                    <AlertCircle className="w-10 h-10 text-rose-500" />
+                    <p className="text-xs font-semibold text-slate-300 max-w-sm leading-relaxed">{error}</p>
+                    <button
+                      type="button"
+                      onClick={() => startScanner()}
+                      className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition cursor-pointer active:scale-95"
+                    >
+                      Thử lại
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <video
+                      id="video"
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover rounded-2xl"
+                      style={{ display: activeEngine === "native" ? "block" : "none" }}
+                    />
+                    <div 
+                      id="reader" 
+                      className="w-full h-full"
+                      style={{ display: activeEngine === "html5-qrcode" ? "block" : "none" }}
+                    />
+                    
+                    {/* Scanner scanning overlay line effect */}
+                    {!isLoading && scannerActive && (
+                      <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-44 border-2 border-emerald-500/60 rounded-xl flex items-center justify-center pointer-events-none z-10">
+                        {/* Red flashing line */}
+                        <div className="absolute left-0 right-0 h-[2px] bg-red-500 shadow-md shadow-red-500/50 animate-pulse"></div>
+                        <span className="absolute bottom-2 text-[10px] bg-slate-900/85 px-3 py-1 rounded-full text-emerald-400 font-bold tracking-wider">
+                          ĐƯA QUÉT QR CCCD VÀO KHUNG
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
 
               {/* Box kết quả quét CCCD đúng chuẩn, hỗ trợ tương tác trực tiếp với DOM */}
               <div 

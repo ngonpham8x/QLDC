@@ -133,11 +133,12 @@ interface HouseholdViewProps {
   isOnline?: boolean;
   onAddResident?: (resident: Resident) => void;
   onUpdateResident?: (resident: Resident) => void;
+  existingEntityIds?: Set<string>;
 }
 
 export default function HouseholdView({ 
   households, residents, currentUser, onAddHousehold, onUpdateHousehold, onDeleteHousehold, onExport, isMobile = false,
-  onSync, offlineQueueCount = 0, isSyncing = false, isOnline = true, onAddResident, onUpdateResident
+  onSync, offlineQueueCount = 0, isSyncing = false, isOnline = true, onAddResident, onUpdateResident, existingEntityIds
 }: HouseholdViewProps) {
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -668,7 +669,7 @@ export default function HouseholdView({
             </>
           )}
 
-          {currentUser?.role !== UserRole.COLLABORATOR && (
+          {true && (
             <button
               onClick={openAddForm}
               className="flex items-center gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2 rounded-xl text-xs font-semibold shadow-md cursor-pointer transition-colors"
@@ -1122,7 +1123,7 @@ export default function HouseholdView({
                   Thành viên ({members.length})
                 </button>
 
-                {currentUser?.role !== UserRole.COLLABORATOR && (
+                {(currentUser?.role !== UserRole.COLLABORATOR || !existingEntityIds?.has(h.id)) && (
                   <>
                     <button
                       onClick={() => openEditForm(h)}

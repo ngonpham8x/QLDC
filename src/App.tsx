@@ -37,7 +37,8 @@ export default function App() {
   const { user, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
     const saved = localStorage.getItem("currentUser");
-    if (saved) {
+    const passed = sessionStorage.getItem("passed2FA") === "true";
+    if (saved && passed) {
       try {
         const parsed = JSON.parse(saved);
         return parsed;
@@ -63,8 +64,27 @@ export default function App() {
   const [regSuccessMessage, setRegSuccessMessage] = useState("");
 
   // 2FA & admin routing States
-  const [pendingUser2FA, setPendingUser2FA] = useState<UserType | null>(null);
-  const [expected2FACode, setExpected2FACode] = useState<string>("");
+  const [pendingUser2FA, setPendingUser2FA] = useState<UserType | null>(() => {
+    const saved = localStorage.getItem("currentUser");
+    const passed = sessionStorage.getItem("passed2FA") === "true";
+    if (saved && !passed) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed;
+      } catch (e) {
+        console.error("Failed to parse saved user for 2FA", e);
+      }
+    }
+    return null;
+  });
+  const [expected2FACode, setExpected2FACode] = useState<string>(() => {
+    const saved = localStorage.getItem("currentUser");
+    const passed = sessionStorage.getItem("passed2FA") === "true";
+    if (saved && !passed) {
+      return Math.floor(100000 + Math.random() * 900000).toString();
+    }
+    return "";
+  });
   const [entered2FACode, setEntered2FACode] = useState<string>("");
   const [showAIChatbox, setShowAIChatbox] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -150,8 +170,19 @@ export default function App() {
             phone: user.phoneNumber || "0900000000"
           };
 
-          setCurrentUser(potentialUser);
-          localStorage.setItem("currentUser", JSON.stringify(potentialUser));
+          const is2FAPassed = sessionStorage.getItem("passed2FA") === "true";
+          if (is2FAPassed) {
+            setCurrentUser(potentialUser);
+            localStorage.setItem("currentUser", JSON.stringify(potentialUser));
+          } else {
+            setPendingUser2FA(potentialUser);
+            setCurrentUser(null);
+            localStorage.setItem("currentUser", JSON.stringify(potentialUser));
+            if (!expected2FACode) {
+              const code = Math.floor(100000 + Math.random() * 900000).toString();
+              setExpected2FACode(code);
+            }
+          }
           setLoginError("");
         } else {
           setLoginError(`Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`);
@@ -170,27 +201,9 @@ export default function App() {
           await contextLogout();
         }
       } else {
-        // If user logs out of Google context, clean up Google currentUser session
-        const saved = localStorage.getItem("currentUser");
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            // If the parsed user is not a Google user (e.g. Phone/OTP, Demo or Google Bypass), preserve it
-            if (parsed.id?.startsWith("demo-") || parsed.id?.startsWith("GOOGLE-bypass-")) {
-              setCurrentUser(parsed);
-            } else if (parsed.id?.startsWith("GOOGLE-") || parsed.id === "google-uid-placeholder" || parsed.id?.length > 20) {
-              setCurrentUser(null);
-              localStorage.removeItem("currentUser");
-            } else {
-              setCurrentUser(parsed);
-            }
-          } catch {
-            setCurrentUser(null);
-            localStorage.removeItem("currentUser");
-          }
-        } else {
-          setCurrentUser(null);
-        }
+        // If Google user is null, we do not clear the local session automatically here to prevent infinite redirect loops 
+        // during initial render/hydration or during temporary Google Auth API connection blips.
+        // Session clearance is strictly handled via explicit user logout action or real-time unauthorized detection.
       }
     };
 
@@ -200,10 +213,45 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem("currentUser", JSON.stringify(currentUser));
-    } else {
+    } else if (!pendingUser2FA) {
       localStorage.removeItem("currentUser");
     }
-  }, [currentUser]);
+  }, [currentUser, pendingUser2FA]);
+
+  // Real-time access/revoke and role change checking heartbeat
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const checkCurrentSession = async () => {
+      try {
+        const res = await fetch(`/api/auth/session-check?email=${encodeURIComponent(currentUser.username)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.allowed) {
+            // User was removed or is not allowed anymore! Kick them immediately!
+            setCurrentUser(null);
+            setPendingUser2FA(null);
+            localStorage.removeItem("currentUser");
+            sessionStorage.removeItem("passed2FA");
+            await contextLogout();
+            alert(`[QUYỀN TRUY CẬP BỊ HỦY] Tài khoản của bạn (${currentUser.username}) đã bị Người quản lý thu hồi quyền truy cập hệ thống. Bạn sẽ bị đăng xuất ngay lập tức.`);
+          } else if (data.role !== currentUser.role) {
+            // Role was modified! Update immediately!
+            const updatedUser = { ...currentUser, role: data.role };
+            setCurrentUser(updatedUser);
+            localStorage.setItem("currentUser", JSON.stringify(updatedUser));
+            alert(`[CẬP NHẬT QUYỀN TRUY CẬP] Vai trò của bạn đã được thay đổi thành: ${data.role === UserRole.SUPER_ADMIN ? "Quản trị viên" : data.role === UserRole.WARD_LEADER ? "Trưởng khu phố" : "Cộng tác viên"}. Hệ thống đã cập nhật phân quyền mới.`);
+          }
+        }
+      } catch (err) {
+        console.warn("Heartbeat session check failed, skipping", err);
+      }
+    };
+
+    // Run check every 3 seconds for immediate response
+    const interval = setInterval(checkCurrentSession, 3000);
+    return () => clearInterval(interval);
+  }, [currentUser, contextLogout]);
   
   // Data State
   const [households, setHouseholds] = useState<Household[]>([]);
@@ -211,6 +259,7 @@ export default function App() {
   const [businesses, setBusinesses] = useState<BusinessHousehold[]>([]);
   const [criteria, setCriteria] = useState<RuralCriteria[]>([]);
   const [changes, setChanges] = useState<DemographicsChange[]>([]);
+  const [existingEntityIds, setExistingEntityIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   // Backup States
@@ -369,6 +418,17 @@ export default function App() {
       setCriteria(cr);
       setChanges(ch);
 
+      // Populate existingEntityIds only once on initial load
+      setExistingEntityIds(prev => {
+        if (prev.size > 0) return prev;
+        const ids = new Set<string>();
+        hh.forEach((h: any) => ids.add(h.id));
+        rs.forEach((r: any) => ids.add(r.id));
+        bs.forEach((b: any) => ids.add(b.id));
+        ch.forEach((c: any) => ids.add(c.id));
+        return ids;
+      });
+
       // Save to localStorage for robust offline capability
       localStorage.setItem("off_households", JSON.stringify(hh));
       localStorage.setItem("off_residents", JSON.stringify(rs));
@@ -393,6 +453,16 @@ export default function App() {
       if (cachedBus) setBusinesses(JSON.parse(cachedBus));
       if (cachedCrit) setCriteria(JSON.parse(cachedCrit));
       if (cachedCh) setChanges(JSON.parse(cachedCh));
+
+      setExistingEntityIds(prev => {
+        if (prev.size > 0) return prev;
+        const ids = new Set<string>();
+        if (cachedHh) JSON.parse(cachedHh).forEach((h: any) => ids.add(h.id));
+        if (cachedRes) JSON.parse(cachedRes).forEach((r: any) => ids.add(r.id));
+        if (cachedBus) JSON.parse(cachedBus).forEach((b: any) => ids.add(b.id));
+        if (cachedCh) JSON.parse(cachedCh).forEach((c: any) => ids.add(c.id));
+        return ids;
+      });
     } finally {
       setLoading(false);
     }
@@ -690,8 +760,19 @@ export default function App() {
       }
       const data = await res.json();
       
-      setCurrentUser(data.user);
-      localStorage.setItem("currentUser", JSON.stringify(data.user));
+      const is2FAPassed = sessionStorage.getItem("passed2FA") === "true";
+      if (is2FAPassed) {
+        setCurrentUser(data.user);
+        localStorage.setItem("currentUser", JSON.stringify(data.user));
+      } else {
+        setPendingUser2FA(data.user);
+        setCurrentUser(null);
+        localStorage.setItem("currentUser", JSON.stringify(data.user));
+        if (!expected2FACode) {
+          const code = Math.floor(100000 + Math.random() * 900000).toString();
+          setExpected2FACode(code);
+        }
+      }
       setLoginError("");
       setOtpMode(false);
       setOtpCode("");
@@ -741,6 +822,10 @@ export default function App() {
 
   const updateHousehold = async (updatedHh: Household, originalId?: string) => {
     const oldId = originalId || updatedHh.id;
+    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(oldId)) {
+      alert("Cộng tác viên không có quyền chỉnh sửa dữ liệu hộ gia đình đã có sẵn trước đó.");
+      return;
+    }
     setHouseholds(prev => {
       const updated = prev.map(h => h.id === oldId ? updatedHh : h);
       syncOfflineCache("households", updated);
@@ -769,6 +854,10 @@ export default function App() {
   };
 
   const deleteHousehold = async (id: string) => {
+    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(id)) {
+      alert("Cộng tác viên không có quyền xoá dữ liệu hộ gia đình đã có sẵn trước đó.");
+      return;
+    }
     let deletedName = "";
     setHouseholds(prev => {
       const deleted = prev.find(h => h.id === id);
@@ -806,6 +895,10 @@ export default function App() {
   };
 
   const updateResident = async (updatedRes: Resident) => {
+    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(updatedRes.id)) {
+      alert("Cộng tác viên không có quyền chỉnh sửa dữ liệu nhân khẩu đã có sẵn trước đó.");
+      return;
+    }
     setResidents(prev => {
       const updated = prev.map(r => r.id === updatedRes.id ? updatedRes : r);
       syncOfflineCache("residents", updated);
@@ -825,6 +918,10 @@ export default function App() {
   };
 
   const deleteResident = async (id: string) => {
+    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(id)) {
+      alert("Cộng tác viên không có quyền xoá dữ liệu nhân khẩu đã có sẵn trước đó.");
+      return;
+    }
     let deletedName = "";
     setResidents(prev => {
       const deleted = prev.find(r => r.id === id);
@@ -897,6 +994,10 @@ export default function App() {
   };
 
   const updateBusiness = async (updatedBus: BusinessHousehold) => {
+    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(updatedBus.id)) {
+      alert("Cộng tác viên không có quyền chỉnh sửa dữ liệu hộ kinh doanh đã có sẵn trước đó.");
+      return;
+    }
     setBusinesses(prev => {
       const updated = prev.map(b => b.id === updatedBus.id ? updatedBus : b);
       syncOfflineCache("businesses", updated);
@@ -917,6 +1018,10 @@ export default function App() {
   };
 
   const deleteBusiness = async (id: string) => {
+    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(id)) {
+      alert("Cộng tác viên không có quyền xoá dữ liệu hộ kinh doanh đã có sẵn trước đó.");
+      return;
+    }
     let deletedName = "";
     setBusinesses(prev => {
       const deleted = prev.find(b => b.id === id);
@@ -1044,6 +1149,10 @@ export default function App() {
   };
 
   const handleExportFullBackup = async () => {
+    if (currentUser?.role === UserRole.COLLABORATOR) {
+      alert("Cộng tác viên không được quyền tải xuống dữ liệu đã có sẵn trước đó.");
+      return;
+    }
     try {
       // Fetch documents first so we can include them in the Excel workbook
       const documents = await fetch("/api/documents").then(r => r.json()).catch(() => []);
@@ -1326,6 +1435,10 @@ export default function App() {
   };
 
   const handleExportJSONBackup = async () => {
+    if (currentUser?.role === UserRole.COLLABORATOR) {
+      alert("Cộng tác viên không được quyền tải xuống dữ liệu đã có sẵn trước đó.");
+      return;
+    }
     try {
       const documents = await fetch("/api/documents").then(r => r.json()).catch(() => []);
       const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(
@@ -1750,6 +1863,23 @@ export default function App() {
             h.notes || ""
           ];
         });
+      }
+    }
+
+    if (currentUser?.role === UserRole.COLLABORATOR) {
+      const hasExisting = rows.some(row => {
+        return row.some(cell => {
+          if (typeof cell === "string") {
+            const cleanCell = cell.replace(/^'/, "");
+            return existingEntityIds.has(cleanCell) || existingEntityIds.has(cell);
+          }
+          return false;
+        });
+      });
+
+      if (hasExisting) {
+        alert("Cộng tác viên không được quyền tải xuống dữ liệu đã có sẵn trước đó.");
+        return;
       }
     }
 
@@ -2892,6 +3022,7 @@ export default function App() {
                       isOnline={isOnline}
                       onAddResident={addResident}
                       onUpdateResident={updateResident}
+                      existingEntityIds={existingEntityIds}
                     />
                   )}
                   {activeTab === "residents" && (
@@ -2904,6 +3035,7 @@ export default function App() {
                       onDeleteResident={deleteResident} 
                       onExport={handleExportSim}
                       isMobile={isMobile}
+                      existingEntityIds={existingEntityIds}
                     />
                   )}
                   {activeTab === "changes" && (
@@ -2936,6 +3068,7 @@ export default function App() {
                       onUpdateBusiness={updateBusiness} 
                       onDeleteBusiness={deleteBusiness} 
                       onExport={handleExportSim}
+                      existingEntityIds={existingEntityIds}
                     />
                   )}
                   {activeTab === "rural" && (

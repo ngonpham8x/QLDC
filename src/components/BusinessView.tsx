@@ -22,10 +22,11 @@ interface BusinessViewProps {
   onUpdateBusiness: (bus: BusinessHousehold) => void;
   onDeleteBusiness: (id: string) => void;
   onExport?: (type: "xlsx" | "pdf", title: string, headers: string[], rows: any[][]) => void;
+  existingEntityIds?: Set<string>;
 }
 
 export default function BusinessView({
-  businesses, residents, households, currentUser, onAddBusiness, onUpdateBusiness, onDeleteBusiness, onExport
+  businesses, residents, households, currentUser, onAddBusiness, onUpdateBusiness, onDeleteBusiness, onExport, existingEntityIds
 }: BusinessViewProps) {
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -221,7 +222,7 @@ export default function BusinessView({
             </>
           )}
 
-          {currentUser?.role !== UserRole.COLLABORATOR && (
+          {true && (
             <button
               onClick={openAddForm}
               className="flex items-center gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-md transition-colors cursor-pointer"
@@ -290,7 +291,7 @@ export default function BusinessView({
                   Chi tiết
                 </button>
 
-                {currentUser?.role !== UserRole.COLLABORATOR && (
+                {(currentUser?.role !== UserRole.COLLABORATOR || !existingEntityIds?.has(b.id)) && (
                   <button
                     onClick={() => openEditForm(b)}
                     className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer"
@@ -299,7 +300,7 @@ export default function BusinessView({
                     <EditIcon className="w-3.5 h-3.5" />
                   </button>
                 )}
-                {currentUser?.role !== UserRole.COLLABORATOR && (
+                {(currentUser?.role !== UserRole.COLLABORATOR || !existingEntityIds?.has(b.id)) && (
                   <button
                     onClick={() => {
                       setBusinessToDelete({ id: b.id, name: b.name });
