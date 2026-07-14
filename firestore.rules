@@ -63,5 +63,11 @@ service cloud.firestore {
       allow get, write: if isValidId(documentId);
       allow list: if true;
     }
+
+    // DismissedEmails rules
+    match /dismissedEmails/{dismissedEmailId} {
+      allow get, write: if isValidId(dismissedEmailId);
+      allow list: if true;
+    }
   }
 }

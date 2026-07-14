@@ -29,6 +29,8 @@ export default function AllowedEmailsView() {
   const [success, setSuccess] = useState("");
   const [editingEmail, setEditingEmail] = useState<AllowedEmail | null>(null);
   const [editingRole, setEditingRole] = useState<UserRole>(UserRole.WARD_LEADER);
+  const [quickApproveAlert, setQuickApproveAlert] = useState<{ id: string; email: string; userName: string } | null>(null);
+  const [quickApproveRole, setQuickApproveRole] = useState<UserRole>(UserRole.WARD_LEADER);
 
   const handleStartEditRole = (allowed: AllowedEmail) => {
     setEditingEmail(allowed);
@@ -119,6 +121,73 @@ export default function AllowedEmailsView() {
     }
   };
 
+  const handleQuickApproveSubmit = async (email: string, role: UserRole, logId?: string) => {
+    setError("");
+    setSuccess("");
+
+    const emailToSubmit = email.trim().toLowerCase();
+    if (!emailToSubmit) return;
+
+    const adminEmails = ["bhttq3@gmail.com", "tayninhdoimoi@gmail.com", "nguyentanbinh3005@gmail.com"];
+    if (adminEmails.includes(emailToSubmit)) {
+      setError("Email này là Người quản lý mặc định, luôn có quyền tối cao.");
+      setQuickApproveAlert(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/allowed-emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: emailToSubmit,
+          role,
+          assignedBy: "Người quản lý"
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Không thể cấp quyền.");
+      }
+
+      const added = await res.json();
+      setAllowedEmails(prev => [...prev, added]);
+      setSuccess(`Đã cấp quyền truy cập thành công cho tài khoản ${emailToSubmit}!`);
+      setQuickApproveAlert(null);
+
+      // If logId is provided, also delete that security alert
+      if (logId) {
+        await fetch(`/api/logs/${logId}`, { method: "DELETE" });
+        setSecurityAlerts(prev => prev.filter(log => log.id !== logId));
+      }
+    } catch (err: any) {
+      setError(err.message || "Lỗi khi cấp quyền.");
+      setQuickApproveAlert(null);
+    }
+  };
+
+  const handleDismissAlert = async (logId: string) => {
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch(`/api/logs/${logId}`, {
+        method: "DELETE"
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Không thể xóa cảnh báo.");
+      }
+
+      setSecurityAlerts(prev => prev.filter(log => log.id !== logId));
+      setSuccess("Đã bỏ qua cảnh báo bảo mật thành công và lưu danh sách bỏ qua.");
+    } catch (err: any) {
+      setError(err.message || "Lỗi khi xóa cảnh báo.");
+    }
+  };
+
   const handleAddPermission = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -159,9 +228,6 @@ export default function AllowedEmailsView() {
   };
 
   const handleRevokePermission = async (email: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy quyền truy cập của tài khoản ${email}?`)) {
-      return;
-    }
     setError("");
     setSuccess("");
 
@@ -183,9 +249,6 @@ export default function AllowedEmailsView() {
   };
 
   const handleApproveRegistration = async (id: string, email: string) => {
-    if (!window.confirm(`Bạn có chắc muốn DUYỆT cấp quyền đăng nhập cho tài khoản ${email}?`)) {
-      return;
-    }
     setError("");
     setSuccess("");
 
@@ -213,9 +276,6 @@ export default function AllowedEmailsView() {
   };
 
   const handleRejectRegistration = async (id: string, email: string) => {
-    if (!window.confirm(`Bạn có chắc muốn TỪ CHỐI cấp quyền đăng nhập cho tài khoản ${email}?`)) {
-      return;
-    }
     setError("");
     setSuccess("");
 
@@ -577,14 +637,31 @@ export default function AllowedEmailsView() {
                             {new Date(log.timestamp).toLocaleTimeString("vi-VN")}
                           </td>
                           <td className="py-3.5 px-4 text-right">
-                            <button
-                              onClick={() => handleQuickApprove(emailAttempt)}
-                              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-200/60 transition-all text-[11px] flex items-center gap-1.5 ml-auto hover:shadow-xs active:scale-95 duration-100 cursor-pointer"
-                              title="Tự động nhập email và cấp quyền hoạt động"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              Cấp quyền nhanh
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setQuickApproveAlert({
+                                    id: log.id,
+                                    email: emailAttempt,
+                                    userName: log.userName || "Cán bộ số"
+                                  });
+                                  setQuickApproveRole(UserRole.WARD_LEADER);
+                                }}
+                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-200/60 transition-all text-[11px] flex items-center gap-1.5 hover:shadow-xs active:scale-95 duration-100 cursor-pointer"
+                                title="Cấp quyền nhanh"
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                                Cấp quyền nhanh
+                              </button>
+                              <button
+                                onClick={() => handleDismissAlert(log.id)}
+                                className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg border border-rose-200/60 transition-all text-[11px] flex items-center gap-1.5 hover:shadow-xs active:scale-95 duration-100 cursor-pointer"
+                                title="Từ chối và xóa cảnh báo"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                Từ chối
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -659,6 +736,87 @@ export default function AllowedEmailsView() {
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl cursor-pointer transition-all shadow-md active:scale-95"
               >
                 Cập nhật vai trò
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cấp Quyền Nhanh */}
+      {quickApproveAlert && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-100 shadow-2xl space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 bg-emerald-50 text-emerald-700 rounded-xl flex items-center justify-center border border-emerald-100">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <h3 className="font-extrabold text-slate-950 text-xs uppercase tracking-wider">
+                  Cấp quyền truy cập nhanh
+                </h3>
+              </div>
+              <button
+                onClick={() => setQuickApproveAlert(null)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 rounded-lg hover:bg-slate-50"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Họ tên cán bộ
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={quickApproveAlert.userName}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 bg-slate-100 font-semibold cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Địa chỉ Email Gmail
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={quickApproveAlert.email}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-500 bg-slate-100 font-semibold cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Chọn vai trò phân quyền
+                </label>
+                <select
+                  value={quickApproveRole}
+                  onChange={(e) => setQuickApproveRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 bg-slate-50/50 focus:bg-white focus:outline-emerald-600 font-semibold cursor-pointer"
+                >
+                  <option value={UserRole.WARD_LEADER}>Trưởng khu phố (Cán bộ Tổ trưởng)</option>
+                  <option value={UserRole.COLLABORATOR}>Cộng tác viên (Điều tra viên nhập liệu)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3">
+              <button
+                onClick={() => setQuickApproveAlert(null)}
+                className="px-4 py-2 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={() => handleQuickApproveSubmit(quickApproveAlert.email, quickApproveRole, quickApproveAlert.id)}
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl cursor-pointer transition-all shadow-md active:scale-95 uppercase tracking-wide"
+              >
+                Cấp quyền ngay
               </button>
             </div>
           </div>

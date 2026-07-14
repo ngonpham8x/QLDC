@@ -729,6 +729,7 @@ interface Database {
   allowedEmails?: AllowedEmail[];
   pendingRegistrations?: PendingRegistration[];
   documents?: QuarterDocument[];
+  dismissedEmails?: string[];
 }
 
 let db: Database = {
@@ -740,7 +741,8 @@ let db: Database = {
   logs: DEFAULT_LOGS,
   allowedEmails: [],
   pendingRegistrations: [],
-  documents: DEFAULT_DOCUMENTS
+  documents: DEFAULT_DOCUMENTS,
+  dismissedEmails: []
 };
 
 function extractAndTrimTổ(address: string): { cleanAddress: string, extractedTổ: string | null } {
@@ -906,6 +908,9 @@ async function loadDatabase() {
       if (!db.pendingRegistrations) {
         db.pendingRegistrations = [];
       }
+      if (!db.dismissedEmails) {
+        db.dismissedEmails = [];
+      }
       if (updated) {
         saveDatabase();
       }
@@ -944,7 +949,7 @@ async function loadFromFirestore() {
   }
   try {
     console.log("Loading database from Firestore Cloud...");
-    const collections = ["households", "residents", "changes", "businesses", "criteria", "logs", "allowedEmails", "pendingRegistrations", "documents"];
+    const collections = ["households", "residents", "changes", "businesses", "criteria", "logs", "allowedEmails", "pendingRegistrations", "documents", "dismissedEmails"];
     
     // Helper to load a collection
     const loadColl = async (name: string) => {
@@ -971,8 +976,9 @@ async function loadFromFirestore() {
     const allowedEmails = await loadColl("allowedEmails");
     const pendingRegistrations = await loadColl("pendingRegistrations");
     const documents = await loadColl("documents");
+    const dismissedEmails = await loadColl("dismissedEmails");
 
-    if (households.length > 0 || residents.length > 0 || changes.length > 0 || businesses.length > 0 || criteria.length > 0 || logs.length > 0 || allowedEmails.length > 0 || pendingRegistrations.length > 0 || documents.length > 0) {
+    if (households.length > 0 || residents.length > 0 || changes.length > 0 || businesses.length > 0 || criteria.length > 0 || logs.length > 0 || allowedEmails.length > 0 || pendingRegistrations.length > 0 || documents.length > 0 || dismissedEmails.length > 0) {
       db.households = households;
       db.residents = residents;
       db.changes = changes;
@@ -982,6 +988,7 @@ async function loadFromFirestore() {
       db.allowedEmails = allowedEmails as AllowedEmail[];
       db.pendingRegistrations = pendingRegistrations as PendingRegistration[];
       db.documents = documents as QuarterDocument[];
+      db.dismissedEmails = dismissedEmails.map(d => d.email || d.id).filter(Boolean) as string[];
       
       console.log("Successfully loaded database from Firestore Cloud!");
       // Save local backup
@@ -2465,7 +2472,55 @@ app.post("/api/criteria", (req, res) => {
 
 // GET audit logs
 app.get("/api/logs", (req, res) => {
-  res.json(db.logs);
+  const dismissed = db.dismissedEmails || [];
+  const filteredLogs = db.logs.filter(log => {
+    if (log.details) {
+      const match = log.details.match(/Tài khoản Google ([^\s@]+@[^\s@]+\.[^\s@]+)/i) || 
+                    log.details.match(/Tài khoản Google ([^\s\(\)]+)/i) || 
+                    log.details.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+      if (match && match[1]) {
+        const email = match[1].toLowerCase().trim().replace(/[(),]/g, "");
+        if (dismissed.includes(email)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+  res.json(filteredLogs);
+});
+
+// DELETE an audit log (used for dismissing security alerts/logs)
+app.delete("/api/logs/:id", (req, res) => {
+  const { id } = req.params;
+  
+  const targetLog = db.logs.find(log => String(log.id).trim() === String(id).trim());
+  let emailAttempt = "";
+  if (targetLog && targetLog.details) {
+    const match = targetLog.details.match(/Tài khoản Google ([^\s@]+@[^\s@]+\.[^\s@]+)/i) || 
+                  targetLog.details.match(/Tài khoản Google ([^\s\(\)]+)/i) || 
+                  targetLog.details.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+    if (match && match[1]) {
+      emailAttempt = match[1].toLowerCase().trim().replace(/[(),]/g, "");
+    }
+  }
+
+  // Filter logs loosely matching ID to be robust
+  db.logs = db.logs.filter(log => String(log.id).trim() !== String(id).trim());
+  
+  if (emailAttempt) {
+    if (!db.dismissedEmails) {
+      db.dismissedEmails = [];
+    }
+    if (!db.dismissedEmails.includes(emailAttempt)) {
+      db.dismissedEmails.push(emailAttempt);
+    }
+    saveToFirestore("dismissedEmails", { id: emailAttempt, email: emailAttempt });
+  }
+
+  saveDatabase();
+  deleteFromFirestore("logs", id);
+  res.json({ success: true, message: "Đã xóa lịch sử cảnh báo thành công." });
 });
 
 // Simulated File Export Endpoint

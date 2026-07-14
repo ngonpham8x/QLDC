@@ -181,6 +181,16 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "title", "issueDate", "issuer", "category"]
+    },
+    "DismissedEmail": {
+      "title": "DismissedEmail",
+      "description": "Sơ đồ các email đã được bỏ qua khỏi lịch sử cảnh báo",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["id", "email"]
     }
   },
   "firestore": {
@@ -219,6 +229,10 @@
     "documents": {
       "schema": "QuarterDocument",
       "description": "Danh sách tài liệu lưu trữ của khu phố"
+    },
+    "dismissedEmails": {
+      "schema": "DismissedEmail",
+      "description": "Danh sách các email đã được bỏ qua cảnh báo bảo mật"
     }
   }
 }

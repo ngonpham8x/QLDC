@@ -8,7 +8,7 @@ import {
   Users, Home, Calendar, Award, Building, Sparkles, FileText, 
   Activity, User, LogOut, ShieldCheck, KeyRound, Smartphone, Check, HelpCircle,
   RefreshCw, AlertTriangle, Download, Wifi, WifiOff, Menu, ChevronLeft, ChevronRight,
-  Eye, EyeOff, Bot, ZoomIn, ZoomOut
+  Eye, EyeOff, Bot, ZoomIn, ZoomOut, Sun, Moon
 } from "lucide-react";
 import { Household, Resident, BusinessHousehold, RuralCriteria, DemographicsChange, DemographicsChangeType, User as UserType, UserRole, AllowedEmail } from "./types";
 
@@ -310,6 +310,23 @@ export default function App() {
     }
     return 100;
   });
+
+  // Theme state: day (light) and night (dark)
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("appTheme");
+      return (saved as "light" | "dark") || "light";
+    }
+    return "light";
+  });
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === "light" ? "dark" : "light";
+      localStorage.setItem("appTheme", next);
+      return next;
+    });
+  };
 
   const handleZoomIn = () => {
     setZoomScale(prev => {
@@ -2659,7 +2676,7 @@ export default function App() {
         // Authenticated Dashboard Layout
         return (
           <div 
-            className="flex-1 flex flex-col overflow-hidden h-full bg-[#F1F5F9] font-sans text-[#1E293B]"
+            className={`flex-1 flex flex-col overflow-hidden h-full bg-[#F1F5F9] font-sans text-[#1E293B] transition-colors duration-200 ${theme === "dark" ? "dark-theme-custom" : ""}`}
             style={{ zoom: `${zoomScale}%` }}
           >
             <div className="flex-1 flex overflow-hidden relative">
@@ -2821,6 +2838,26 @@ export default function App() {
                       </button>
                     </div>
 
+                    {/* Theme Toggle Button (Day / Night) */}
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="p-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-xs active:scale-95 duration-150"
+                      title={theme === "light" ? "Chuyển sang giao diện Đêm (Tối)" : "Chuyển sang giao diện Ngày (Sáng)"}
+                    >
+                      {theme === "light" ? (
+                        <div className="flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-extrabold text-slate-700 uppercase tracking-wide">
+                          <Moon className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Giao diện Đêm</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5 px-1.5 py-0.5 text-[10px] font-extrabold text-emerald-600 uppercase tracking-wide">
+                          <Sun className="w-3.5 h-3.5 text-amber-500 animate-spin-slow" />
+                          <span>Giao diện Ngày</span>
+                        </div>
+                      )}
+                    </button>
+
                     {/* Toggle AI Chatbox Assistant */}
                     <button
                       onClick={handleToggleAIChatbox}
@@ -2897,6 +2934,20 @@ export default function App() {
                         <option value="permissions" className="text-center">Cấp quyền truy cập</option>
                       )}
                     </select>
+
+                    {/* Theme Toggle Button for mobile */}
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="p-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-750 rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
+                      title={theme === "light" ? "Chuyển sang giao diện Đêm" : "Chuyển sang giao diện Ngày"}
+                    >
+                      {theme === "light" ? (
+                        <Moon className="w-3.5 h-3.5 text-slate-300" />
+                      ) : (
+                        <Sun className="w-3.5 h-3.5 text-amber-400" />
+                      )}
+                    </button>
 
                     {/* Toggle AI Button for mobile */}
                     <button
