@@ -93,7 +93,7 @@ if (fs.existsSync(firebaseConfigPath)) {
   console.warn("firebase-applet-config.json not found. Firestore features will be disabled.");
 }
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const DATA_FILE_PATH = path.join(process.cwd(), "src", "data_store.json");
 
 // Lazy load Gemini API
