@@ -66,7 +66,7 @@ export default function App() {
   // 2FA & admin routing States
   const [pendingUser2FA, setPendingUser2FA] =
   useState<UserType | null>(null);
-  cconst [expected2FACode, setExpected2FACode] = useState<string>("");
+  const [expected2FACode, setExpected2FACode] = useState<string>("");
   const [entered2FACode, setEntered2FACode] = useState<string>("");
   const [showAIChatbox, setShowAIChatbox] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
