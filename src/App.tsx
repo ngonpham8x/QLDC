@@ -37,7 +37,7 @@ export default function App() {
   const { user, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
     const saved = localStorage.getItem("currentUser");
-    const passed = sessionStorage.getItem("passed2FA") === "true";
+    const passed = localStorage.getItem("passed2FA") === "true";
     if (saved && passed) {
       try {
         const parsed = JSON.parse(saved);
@@ -66,7 +66,7 @@ export default function App() {
   // 2FA & admin routing States
   const [pendingUser2FA, setPendingUser2FA] = useState<UserType | null>(() => {
     const saved = localStorage.getItem("currentUser");
-    const passed = sessionStorage.getItem("passed2FA") === "true";
+    const passed = localStorage.getItem("passed2FA") === "true";
     if (saved && !passed) {
       try {
         const parsed = JSON.parse(saved);
@@ -79,7 +79,7 @@ export default function App() {
   });
   const [expected2FACode, setExpected2FACode] = useState<string>(() => {
     const saved = localStorage.getItem("currentUser");
-    const passed = sessionStorage.getItem("passed2FA") === "true";
+    const passed = localStorage.getItem("passed2FA") === "true";
     if (saved && !passed) {
       return Math.floor(100000 + Math.random() * 900000).toString();
     }
@@ -174,7 +174,7 @@ export default function App() {
           };
 
          
-const is2FAPassed = sessionStorage.getItem("passed2FA") === "true";
+const is2FAPassed = localStorage.getItem("passed2FA") === "true";
 
 if (is2FAPassed) {
     setCurrentUser(potentialUser);
@@ -257,7 +257,7 @@ await fetch("/api/auth/send-otp", {
   })
 });
             localStorage.removeItem("currentUser");
-            sessionStorage.removeItem("passed2FA");
+            localStorage.removeItem("passed2FA");
             await contextLogout();
             alert(`[QUYỀN TRUY CẬP BỊ HỦY] Tài khoản của bạn (${currentUser.username}) đã bị Người quản lý thu hồi quyền truy cập hệ thống. Bạn sẽ bị đăng xuất ngay lập tức.`);
           } else if (data.role !== currentUser.role) {
@@ -721,7 +721,7 @@ localStorage.setItem(
       }
       const data = await res.json();
       
-      sessionStorage.setItem("passed2FA", "true");
+      localStorage.setItem("passed2FA", "true");
       setCurrentUser(data.user);
       localStorage.setItem("currentUser", JSON.stringify(data.user));
       setLoginError("");
@@ -831,14 +831,14 @@ localStorage.setItem(
       }
       const data = await res.json();
       
-      const is2FAPassed = sessionStorage.getItem("passed2FA") === "true";
+      const is2FAPassed = localStorage.getItem("passed2FA") === "true";
 
 if (is2FAPassed) {
     setCurrentUser(data.user);
     setPendingUser2FA(null);
     localStorage.setItem("currentUser", JSON.stringify(data.user));
 } else {
-    sessionStorage.setItem("passed2FA", "true");
+    localStorage.setItem("passed2FA", "true");
     setCurrentUser(data.user);
     setPendingUser2FA(null);
     localStorage.setItem("currentUser", JSON.stringify(data.user));
@@ -863,7 +863,7 @@ setOtpCode("");
 
   // Xóa dữ liệu lưu trên trình duyệt
   localStorage.removeItem("currentUser");
-  sessionStorage.removeItem("passed2FA");
+  localStorage.removeItem("passed2FA");
 
   // Reset giao diện
   setOtpMode(false);
@@ -2201,7 +2201,7 @@ setOtpCode("");
                     e.preventDefault();
                     if (entered2FACode.trim() === expected2FACode) {
                       // 2FA Succeeded!
-                      sessionStorage.setItem("passed2FA", "true");
+                      localStorage.setItem("passed2FA", "true");
                       setCurrentUser(pendingUser2FA);
                       localStorage.setItem("currentUser", JSON.stringify(pendingUser2FA));
                       
@@ -2275,7 +2275,7 @@ setPendingUser2FA(null);
 setOtpUser(null);
 
 localStorage.removeItem("currentUser");
-sessionStorage.removeItem("passed2FA");
+localStorage.removeItem("passed2FA");
 
 if (user) {
     await contextLogout();
