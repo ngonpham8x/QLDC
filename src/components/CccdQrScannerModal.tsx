@@ -264,14 +264,43 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
 
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          });
+  video: {
+    facingMode: {
+      ideal: "environment"
+    },
+    width: {
+      ideal: 1920,
+      max: 2560
+    },
+    height: {
+      ideal: 1080,
+      max: 1440
+    }
+  }
+});
 
           localStreamRef.current = stream;
+          try {
+  const track = stream.getVideoTracks()[0];
+
+  const capabilities =
+    track.getCapabilities?.();
+
+  if (
+    capabilities &&
+    (capabilities as any).focusMode
+  ) {
+    await track.applyConstraints({
+      advanced: [
+        {
+          focusMode: "continuous"
+        } as any
+      ]
+    });
+  }
+} catch (e) {
+  console.log("Focus mode not supported");
+}
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
             videoRef.current.setAttribute("playsinline", "true"); // iOS compatibility
@@ -325,10 +354,10 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
           scannerRef.current = html5QrCodeInstance;
 
           const config = {
-            fps: 30, // Tăng fps lên 30 để nhận diện siêu nhanh, mượt mà
+            fps: 60, // Tăng fps lên 60 để nhận diện siêu nhanh, mượt mà
             qrbox: (width: number, height: number) => {
               // Tăng diện tích nhận diện lên 85% để dễ bắt mã QR hơn, không cần căn chỉnh quá khít
-              const size = Math.min(width, height) * 0.85;
+              const size = Math.min(width, height) * 0.95;
               return { width: size, height: size };
             },
             aspectRatio: 1.0, // Giữ tỷ lệ khung hình chuẩn
