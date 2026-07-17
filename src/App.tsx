@@ -64,27 +64,9 @@ export default function App() {
   const [regSuccessMessage, setRegSuccessMessage] = useState("");
 
   // 2FA & admin routing States
-  const [pendingUser2FA, setPendingUser2FA] = useState<UserType | null>(() => {
-    const saved = localStorage.getItem("currentUser");
-    const passed = localStorage.getItem("passed2FA") === "true";
-    if (saved && !passed) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed;
-      } catch (e) {
-        console.error("Failed to parse saved user for 2FA", e);
-      }
-    }
-    return null;
-  });
-  const [expected2FACode, setExpected2FACode] = useState<string>(() => {
-    const saved = localStorage.getItem("currentUser");
-    const passed = localStorage.getItem("passed2FA") === "true";
-    if (saved && !passed) {
-      return Math.floor(100000 + Math.random() * 900000).toString();
-    }
-    return "";
-  });
+  const [pendingUser2FA, setPendingUser2FA] =
+  useState<UserType | null>(null);
+  cconst [expected2FACode, setExpected2FACode] = useState<string>("");
   const [entered2FACode, setEntered2FACode] = useState<string>("");
   const [showAIChatbox, setShowAIChatbox] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
