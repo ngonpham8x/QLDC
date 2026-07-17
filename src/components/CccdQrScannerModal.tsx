@@ -441,7 +441,7 @@ ctx.drawImage(
               80
             );
 
-          qqr = jsQR(
+          qr = jsQR(
   imageData.data,
   imageData.width,
   imageData.height,
@@ -495,6 +495,73 @@ ctx.drawImage(
         cropData,
         180
       );
+      if (!qr) {
+
+  const zoomCanvas =
+    document.createElement("canvas");
+
+  zoomCanvas.width =
+    cropData.width * 2;
+
+  zoomCanvas.height =
+    cropData.height * 2;
+
+  const zoomCtx =
+    zoomCanvas.getContext("2d");
+
+  if (zoomCtx) {
+
+    zoomCtx.imageSmoothingEnabled =
+      false;
+
+    const tempCanvas =
+      document.createElement("canvas");
+
+    tempCanvas.width =
+      cropData.width;
+
+    tempCanvas.height =
+      cropData.height;
+
+    const tempCtx =
+      tempCanvas.getContext("2d");
+
+    if (tempCtx) {
+
+      tempCtx.putImageData(
+        cropData,
+        0,
+        0
+      );
+
+      zoomCtx.drawImage(
+        tempCanvas,
+        0,
+        0,
+        zoomCanvas.width,
+        zoomCanvas.height
+      );
+
+      const zoomData =
+        zoomCtx.getImageData(
+          0,
+          0,
+          zoomCanvas.width,
+          zoomCanvas.height
+        );
+
+      qr = jsQR(
+        zoomData.data,
+        zoomData.width,
+        zoomData.height,
+        {
+          inversionAttempts:
+            "attemptBoth"
+        }
+      );
+    }
+  }
+}
 
     qr = jsQR(
   boostedCrop.data,
