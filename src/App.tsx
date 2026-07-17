@@ -37,16 +37,16 @@ export default function App() {
   const { user, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
     const saved = localStorage.getItem("currentUser");
-    const passed = localStorage.getItem("passed2FA") === "true";
-    if (saved && passed) {
-      try {
-        const parsed = JSON.parse(saved);
-        return parsed;
-      } catch (e) {
-        console.error("Failed to parse saved user", e);
-      }
-    }
-    return null;
+
+if (saved) {
+  try {
+    return JSON.parse(saved);
+  } catch (e) {
+    console.error("Failed to parse saved user", e);
+  }
+}
+
+return null;
   });
 
   // Login Form States
@@ -813,18 +813,15 @@ localStorage.setItem(
       }
       const data = await res.json();
       
-      const is2FAPassed = localStorage.getItem("passed2FA") === "true";
+      localStorage.setItem("passed2FA", "true");
 
-if (is2FAPassed) {
-    setCurrentUser(data.user);
-    setPendingUser2FA(null);
-    localStorage.setItem("currentUser", JSON.stringify(data.user));
-} else {
-    localStorage.setItem("passed2FA", "true");
-    setCurrentUser(data.user);
-    setPendingUser2FA(null);
-    localStorage.setItem("currentUser", JSON.stringify(data.user));
-}
+setCurrentUser(data.user);
+setPendingUser2FA(null);
+
+localStorage.setItem(
+  "currentUser",
+  JSON.stringify(data.user)
+);
 
 setLoginError("");
 setOtpMode(false);
