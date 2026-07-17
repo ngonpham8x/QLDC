@@ -31,19 +31,35 @@ const SAMPLE_CCCD_STRINGS = [
 ];
 
 // Helper to boost image contrast in-place. Crucial for laminated, shiny CCCD cards.
-const boostContrast = (imageData: ImageData, factor: number = 2.0): ImageData => {
+const boostContrast = (
+  imageData: ImageData,
+  contrast: number = 80
+): ImageData => {
   const data = imageData.data;
-  const len = data.length;
-  for (let i = 0; i < len; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    
-    // Contrast formula: (value - 128) * factor + 128 clamped to [0, 255]
-    data[i]     = Math.max(0, Math.min(255, Math.round((r - 128) * factor + 128)));
-    data[i + 1] = Math.max(0, Math.min(255, Math.round((g - 128) * factor + 128)));
-    data[i + 2] = Math.max(0, Math.min(255, Math.round((b - 128) * factor + 128)));
+
+  const factor =
+    (259 * (contrast + 255)) /
+    (255 * (259 - contrast));
+
+  for (let i = 0; i < data.length; i += 4) {
+    const gray =
+      0.299 * data[i] +
+      0.587 * data[i + 1] +
+      0.114 * data[i + 2];
+
+    const enhanced =
+      factor * (gray - 128) + 128;
+
+    const value = Math.max(
+      0,
+      Math.min(255, enhanced)
+    );
+
+    data[i] = value;
+    data[i + 1] = value;
+    data[i + 2] = value;
   }
+
   return imageData;
 };
 
@@ -60,6 +76,7 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [scannerActive, setScannerActive] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
   const [retryTrigger, setRetryTrigger] = useState(0);
 
   // Auto-test and Scanner states
@@ -231,7 +248,46 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
       scannerRef.current = null;
     }
   };
+const toggleTorch = async () => {
+  try {
+    const stream = localStreamRef.current;
 
+    if (!stream) {
+      alert("Camera chưa khởi động");
+      return;
+    }
+
+    const track = stream.getVideoTracks()[0];
+
+    const capabilities =
+      track.getCapabilities?.() as any;
+
+    if (!capabilities?.torch) {
+      alert(
+        "Thiết bị này không hỗ trợ Flash"
+      );
+      return;
+    }
+
+    await track.applyConstraints({
+      advanced: [
+        {
+          torch: !torchEnabled
+        } as any
+      ]
+    });
+
+    setTorchEnabled(
+      !torchEnabled
+    );
+
+  } catch (err) {
+    console.error(
+      "Lỗi Flash:",
+      err
+    );
+  }
+};
   // 4. Cấu hình và khởi động camera (startScanner)
   const startScanner = (engineToUse?: "native" | "html5-qrcode") => {
     // Ẩn bảng kết quả cũ
@@ -310,24 +366,167 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
           const barcodeDetector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
 
           const scanFrame = async () => {
-            const currentVideo = videoRef.current;
-            if (currentVideo && currentVideo.readyState === currentVideo.HAVE_ENOUGH_DATA) {
-              try {
-                const barcodes = await barcodeDetector.detect(currentVideo);
-                if (barcodes.length > 0) {
-                  const rawData = barcodes[0].rawValue;
-                  if (rawData) {
-                    stopAllCameraStreams();
-                    parseCCCDData(rawData);
-                    return; // Done
-                  }
-                }
-              } catch (e) {
-                console.error("Lỗi nhận diện bằng BarcodeDetector:", e);
-              }
-            }
-            animationFrameIdRef.current = requestAnimationFrame(scanFrame);
-          };
+  const currentVideo = videoRef.current;
+
+  if (
+    currentVideo &&
+    currentVideo.readyState === currentVideo.HAVE_ENOUGH_DATA
+  ) {
+    try {
+
+      // ===== Engine 1: BarcodeDetector =====
+      const barcodes =
+        await barcodeDetector.detect(currentVideo);
+
+      if (barcodes.length > 0) {
+        const rawData =
+          barcodes[0].rawValue;
+
+        if (rawData) {
+          stopAllCameraStreams();
+          parseCCCDData(rawData);
+          return;
+        }
+      }
+
+      // ===== Engine 2: jsQR dự phòng =====
+
+      const canvas =
+        document.createElement("canvas");
+
+      const ctx =
+        canvas.getContext("2d");
+
+      if (ctx) {
+
+        canvas.width =
+          currentVideo.videoWidth;
+
+        canvas.height =
+          currentVideo.videoHeight;
+
+        ctx.imageSmoothingEnabled = false;
+ctx.filter =
+  "contrast(180%) brightness(120%)";
+
+ctx.drawImage(
+  currentVideo,
+  0,
+  0
+);
+
+        let imageData =
+          ctx.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+          );
+
+        let qr = jsQR(
+  imageData.data,
+  imageData.width,
+  imageData.height,
+  {
+    inversionAttempts:
+      "attemptBoth"
+  }
+);
+
+        if (!qr) {
+
+          imageData =
+            boostContrast(
+              imageData,
+              80
+            );
+
+          qqr = jsQR(
+  imageData.data,
+  imageData.width,
+  imageData.height,
+  {
+    inversionAttempts:
+      "attemptBoth"
+  }
+);
+        }
+
+       if (!qr) {
+
+  const cropSize = Math.round(
+    Math.min(
+      canvas.width,
+      canvas.height
+    ) * 0.9
+  );
+
+  const cropX =
+    Math.round(
+      (canvas.width - cropSize) / 2
+    );
+
+  const cropY =
+    Math.round(
+      (canvas.height - cropSize) / 2
+    );
+
+  const cropData =
+    ctx.getImageData(
+      cropX,
+      cropY,
+      cropSize,
+      cropSize
+    );
+
+  qr = jsQR(
+  cropData.data,
+  cropData.width,
+  cropData.height,
+  {
+    inversionAttempts: "attemptBoth"
+  }
+);
+
+  if (!qr) {
+
+    const boostedCrop =
+      boostContrast(
+        cropData,
+        180
+      );
+
+    qr = jsQR(
+  boostedCrop.data,
+  boostedCrop.width,
+  boostedCrop.height,
+  {
+    inversionAttempts: "attemptBoth"
+  }
+);
+  }
+}
+        if (qr?.data) {
+
+          stopAllCameraStreams();
+
+          parseCCCDData(qr.data);
+
+          return;
+        }
+      }
+
+    } catch (e) {
+      console.error(
+        "Lỗi quét QR:",
+        e
+      );
+    }
+  }
+
+  animationFrameIdRef.current =
+    requestAnimationFrame(scanFrame);
+};
 
           setIsLoading(false);
           setScannerActive(true);
@@ -501,6 +700,7 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
         canvas.height = img.height;
         const ctx = canvas.getContext("2d");
         if (ctx) {
+ctx.imageSmoothingEnabled = false;
           ctx.drawImage(img, 0, 0);
           
           // Pass 1: Raw Full Image
@@ -808,6 +1008,15 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
                 className="relative bg-slate-950 aspect-video rounded-2xl overflow-hidden shadow-inner border border-slate-800 flex items-center justify-center"
                 style={{ display: scannedResult ? 'none' : 'flex' }}
               >
+                <button
+  type="button"
+  onClick={toggleTorch}
+  className="absolute top-3 right-3 z-20 px-3 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold rounded-xl shadow-lg"
+>
+  {torchEnabled
+    ? "🔦 Tắt Flash"
+    : "🔦 Bật Flash"}
+</button>
                 {isLoading && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-3 z-10 bg-slate-950/80">
                     <RefreshCw className="w-8 h-8 animate-spin text-emerald-400" />
