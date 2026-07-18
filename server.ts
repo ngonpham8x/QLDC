@@ -1557,6 +1557,18 @@ app.get("/api/auth/session-check", (req, res) => {
   if (!db.allowedEmails) db.allowedEmails = [];
   
   const allowedUser = db.allowedEmails.find(a => a.email.toLowerCase() === lowerEmail);
+  const superAdmins = [
+  "bhttq3@gmail.com",
+  "tayninhdoimoi@gmail.com",
+  "nguyentanbinh3005@gmail.com",
+];
+
+if (superAdmins.includes(lowerEmail)) {
+  return res.json({
+    allowed: true,
+    role: UserRole.SUPER_ADMIN,
+  });
+}
   if (!allowedUser) {
     return res.json({ allowed: false });
   }
