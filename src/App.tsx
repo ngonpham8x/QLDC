@@ -52,12 +52,7 @@ export default function App() {
   const [regSuccessMessage, setRegSuccessMessage] = useState("");
 
   // 2FA & admin routing States
-  const [pendingUser2FA, setPendingUser2FA] =
-  useState<UserType | null>(null);
-  const [expected2FACode, setExpected2FACode] = useState<string>("");
-  const [entered2FACode, setEntered2FACode] = useState<string>("");
-  const lastOtpRequestUserId = useRef("");
-  const twoFactorSessionKey = "verified2FAUserId";
+  
   const [showAIChatbox, setShowAIChatbox] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("showAIChatbox") !== "false";
@@ -102,99 +97,81 @@ export default function App() {
     }
   };
 
-  const requestTwoFactorCode = async (potentialUser: UserType) => {
-    setExpected2FACode("");
-    setEntered2FACode("");
-    const response = await fetch("/api/auth/send-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: potentialUser.username }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Không thể gửi mã 2FA.");
-    setExpected2FACode(data.developmentCode || "");
-  };
 
   useEffect(() => {
     localStorage.removeItem("currentUser");
-    localStorage.removeItem("passed2FA");
+    // localStorage.removeItem("passed2FA");
   }, []);
 
   // Synchronize Google login session with local currentUser state
-  useEffect(() => {
-    const checkUserAccess = async () => {
-      if (sessionStorage.getItem("explicit_logout") === "true") {
+  // Synchronize Google login session with local currentUser state
+useEffect(() => {
+  const checkUserAccess = async () => {
+    if (sessionStorage.getItem("explicit_logout") === "true") return;
+    if (authLoading) return;
+
+    if (!user) {
+      setCurrentUser(null);
+      return;
+    }
+
+    const email = user.email || "";
+    const displayName = user.displayName || email || "Cán bộ số";
+
+    try {
+      const res = await fetch(
+        `/api/auth/session-check?email=${encodeURIComponent(email)}`
+      );
+
+      if (!res.ok) {
+        throw new Error("Session check failed");
+      }
+
+      const access = await res.json();
+
+      if (access.allowed && access.role) {
+        setCurrentUser({
+          id: user.uid,
+          username: email || user.uid,
+          fullName: displayName,
+          role: access.role,
+          phone: user.phoneNumber || "0900000000",
+        });
+
+        setLoginError("");
         return;
       }
-      if (authLoading) return;
-      if (user) {
-        const email = user.email || "";
-        const displayName = user.displayName || email || "Cán bộ số";
 
-        let assignedRole: UserRole | null = null;
-        let isAuthorized = false;
+      setLoginError(
+        `Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`
+      );
 
-        try {
-          const res = await fetch(`/api/auth/session-check?email=${encodeURIComponent(email)}`);
-          if (res.ok) {
-            const access = await res.json();
-            isAuthorized = access.allowed === true;
-            assignedRole = access.role || null;
-          }
-        } catch (e) {
-          console.error("Failed to check access list", e);
-        }
-
-        if (isAuthorized && assignedRole) {
-          const potentialUser = {
-            id: user.uid,
-            username: email || user.uid,
-            fullName: displayName,
-            role: assignedRole,
-            phone: user.phoneNumber || "0900000000"
-          };
-
-          if (sessionStorage.getItem(twoFactorSessionKey) === user.uid) {
-            setPendingUser2FA(null);
-            setCurrentUser(potentialUser);
-          } else {
-            setCurrentUser(null);
-            setPendingUser2FA(potentialUser);
-            if (lastOtpRequestUserId.current !== user.uid) {
-              lastOtpRequestUserId.current = user.uid;
-              requestTwoFactorCode(potentialUser).catch((error) => {
-                setLoginError(error.message || "Không thể gửi mã 2FA.");
-              });
-            }
-          }
-          setLoginError("");
-        } else {
-          setLoginError(`Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`);
-          // Call server API to log this unauthorized attempt and trigger an email warning
-          try {
-            fetch("/api/auth/unauthorized-attempt", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email, displayName })
-            }).catch(e => console.warn("Failed to report unauthorized attempt", e));
-          } catch (err) {
-            console.error("Error calling unauthorized logging", err);
-          }
-          setCurrentUser(null);
-          setPendingUser2FA(null);
-          sessionStorage.removeItem(twoFactorSessionKey);
-          localStorage.removeItem("currentUser");
-          await contextLogout();
-        }
-      } else {
-        setCurrentUser(null);
-        setPendingUser2FA(null);
-        sessionStorage.removeItem(twoFactorSessionKey);
+      try {
+        await fetch("/api/auth/unauthorized-attempt", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            displayName,
+          }),
+        });
+      } catch (e) {
+        console.warn(e);
       }
-    };
 
-    checkUserAccess();
-  }, [authLoading, contextLogout, user]);
+      setCurrentUser(null);
+      localStorage.removeItem("currentUser");
+      await contextLogout();
+    } catch (err) {
+      console.error(err);
+      setCurrentUser(null);
+    }
+  };
+
+  checkUserAccess();
+}, [authLoading, user, contextLogout]);
 
   // Real-time access/revoke and role change checking heartbeat
   useEffect(() => {
@@ -208,10 +185,10 @@ export default function App() {
           if (!data.allowed) {
             // User was removed or is not allowed anymore! Kick them immediately!
             sessionStorage.setItem("explicit_logout", "true");
-            sessionStorage.removeItem(twoFactorSessionKey);
+            // xóa dòng này hoàn toàn
             setCurrentUser(null);
             localStorage.removeItem("currentUser");
-            localStorage.removeItem("passed2FA");
+            // localStorage.removeItem("passed2FA");
             await contextLogout();
             alert(`[QUYỀN TRUY CẬP BỊ HỦY] Tài khoản của bạn (${currentUser.username}) đã bị Người quản lý thu hồi quyền truy cập hệ thống. Bạn sẽ bị đăng xuất ngay lập tức.`);
           } else if (data.role !== currentUser.role) {
@@ -255,14 +232,8 @@ export default function App() {
   });
 
   // Login Form States
-  const [otpMode, setOtpMode] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [sentOtp, setSentOtp] = useState("");
-  const [isRealSMSSent, setIsRealSMSSent] = useState(false);
-  const [otpGateway, setOtpGateway] = useState("");
-  const [otpMessage, setOtpMessage] = useState("");
+  
   const [loginError, setLoginError] = useState<React.ReactNode>("");
-  const [otpUser, setOtpUser] = useState<any>(null);
 
   // Offline & Synchronize state and helpers (Disabled dynamic offline per user request)
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -525,8 +496,8 @@ export default function App() {
     setLoginError("");
     try {
       await contextLogin();
-      // The Firebase auth-state listener now checks the server allow-list and starts 2FA.
-      setLoginError("Đang kiểm tra quyền truy cập và gửi mã 2FA...");
+      // Google đăng nhập, kiểm tra quyền truy cập.
+setLoginError("Đang kiểm tra quyền truy cập...");
     } catch (error: any) {
       const errorStr = (error && error.message) ? String(error.message).toLowerCase() : "";
       const errorCode = (error && error.code) ? String(error.code).toLowerCase() : "";
@@ -698,61 +669,19 @@ export default function App() {
     }
   };
 
-  // Handle actual phone login with OTP
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    sessionStorage.removeItem("explicit_logout");
-    if (!loginPhone.match(/^0[0-9]{9}$/)) {
-      setLoginError("Số điện thoại không hợp lệ! Vui lòng nhập định dạng 10 số (ví dụ: 0901234567).");
-      return;
-    }
-    setLoginError("");
-    try {
-     const res = await fetch("/api/auth/send-otp", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    email: user?.email
-  })
-});
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Không thể gửi OTP.");
-      }
-      const data = await res.json();
-      setSentOtp(data.otp || "");
-      setIsRealSMSSent(!!data.isRealSMS);
-      setOtpGateway(data.gateway || "");
-      setOtpMessage(data.message || "");
-      
-    } catch (err: any) {
-      setLoginError(err.message || "Lỗi kết nối khi gửi OTP.");
-    }
-  };
+  
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError("Phương thức OTP cũ đã bị tắt. Hãy sử dụng mã 2FA được gửi đến email Google của bạn.");
-  };
+  
 
   const handleLogout = async () => {
   sessionStorage.setItem("explicit_logout", "true");
-  sessionStorage.removeItem(twoFactorSessionKey);
-  lastOtpRequestUserId.current = "";
 
-  // Xóa toàn bộ state đăng nhập & 2FA
+  // Xóa trạng thái đăng nhập
   setCurrentUser(null);
-  setPendingUser2FA(null);
-  setOtpUser(null);
+  setLoginError("");
 
   // Xóa dữ liệu lưu trên trình duyệt
   localStorage.removeItem("currentUser");
-  localStorage.removeItem("passed2FA");
-
-  // Reset giao diện
-  setOtpMode(false);
-  setOtpCode("");
-  setLoginError("");
 
   // Đăng xuất Google
   if (user) {
@@ -2048,174 +1977,8 @@ export default function App() {
         // Gated Login View
         if (!currentUser) {
           // Sub-view 1: Two-Factor Authentication (2FA) Code Verification
-          if (pendingUser2FA) {
-            return (
-
-              <div 
-                id="auth-gate-container" 
-                className="h-full w-full bg-slate-900 flex flex-col items-center justify-start p-4 py-8 overflow-y-auto relative"
-              >
-                <div className="flex-1" />
-                <div className="bg-slate-950 border border-slate-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl shrink-0 p-6 space-y-6 max-[400px]:p-4 max-[400px]:space-y-4 max-[400px]:rounded-2xl">
-                  <div className="text-center space-y-2 max-[400px]:space-y-1">
-                    <div className="w-14 h-14 max-[400px]:w-11 max-[400px]:h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-lg">
-                      <KeyRound className="w-7 h-7 max-[400px]:w-5 max-[400px]:h-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-black text-sm tracking-wide text-white uppercase max-[400px]:text-xs">XÁC THỰC 2 LỚP BẢO MẬT (2FA)</h3>
-                      <p className="text-[10px] text-slate-400 max-[400px]:text-[9px]">Yêu cầu xác minh danh tính cán bộ trước khi truy cập dữ liệu</p>
-                    </div>
-                  </div>
-
-                  <div className="p-4 max-[400px]:p-3 bg-emerald-950/40 border border-emerald-500/20 rounded-2xl text-center space-y-2 max-[400px]:space-y-1">
-                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest max-[400px]:text-[9px]">🔐 MÃ XÁC THỰC THỜI GIAN THỰC (OTP/2FA)</p>
-                    <p className="text-2xl font-black font-mono tracking-[0.25em] text-white bg-slate-900/90 py-2 rounded-xl border border-emerald-500/10 max-[400px]:text-xl max-[400px]:tracking-[0.15em] max-[400px]:py-1.5">
-                      {expected2FACode}
-                    </p>
-                    <p className="text-[9px] text-slate-400 font-medium leading-relaxed max-[400px]:text-[8px]">
-                      Sử dụng mã 6 chữ số ngẫu nhiên thời gian thực này để hoàn thành bước xác thực thứ hai.
-                    </p>
-                  </div>
-
-                  {loginError && (
-                    <div className="bg-rose-950/50 border border-rose-500/20 rounded-xl p-3 text-[10px] text-rose-300 font-bold leading-relaxed text-center">
-                      {loginError}
-                    </div>
-                  )}
-
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (entered2FACode.trim() === expected2FACode) {
-                      // 2FA Succeeded!
-                      localStorage.setItem("passed2FA", "true");
-                      setCurrentUser(pendingUser2FA);
-                      localStorage.setItem("currentUser", JSON.stringify(pendingUser2FA));
-                      
-                      // Log on server-side audit trail
-                      fetch("/api/auth/log-google", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          email: pendingUser2FA.username || "BHTTQ3@gmail.com",
-                          name: pendingUser2FA.fullName || "Cán bộ số",
-                          role: pendingUser2FA.role || UserRole.SUPER_ADMIN,
-                          action: "Đăng nhập + 2FA",
-                          details: `Đăng nhập hệ thống và hoàn thành xác thực 2 lớp. Vai trò: ${pendingUser2FA.role}`
-                        })
-                      }).catch(e => console.error(e));
- 
-                      setEntered2FACode("");
-                      setLoginError("");
-                    } else {
-                      setLoginError("Mã xác thực 2 lớp không chính xác! Vui lòng kiểm tra lại.");
-                    }
-                  }} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Nhập mã 2FA 6 số:</label>
-                      <input
-                        type="text"
-                        maxLength={6}
-                        required
-                        placeholder="______"
-                        value={entered2FACode}
-                        onChange={(e) => setEntered2FACode(e.target.value.replace(/\D/g, ""))}
-                        className="w-full text-center py-3 bg-slate-900 border border-slate-800 rounded-xl font-bold font-mono text-lg text-white tracking-[0.25em] focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all cursor-pointer"
-                    >
-                      Xác minh & Vào hệ thống
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        sessionStorage.setItem("explicit_logout", "true");
-                        
-await fetch("/api/auth/send-otp", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    email: user?.email
-  })
-});
-                      
-await fetch("/api/auth/send-otp", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    email: user?.email
-  })
-});
-                        setEntered2FACode("");
-setLoginError("");
-
-setPendingUser2FA(null);
-setOtpUser(null);
-
-localStorage.removeItem("currentUser");
-localStorage.removeItem("passed2FA");
-
-if (user) {
-    await contextLogout();
-}
-                      }}
-                      className="w-full py-2.5 bg-transparent border border-slate-850 hover:border-slate-800 text-slate-400 text-[11px] font-bold rounded-xl transition-all cursor-pointer"
-                    >
-                      Quay lại màn hình đăng nhập
-                    </button>
-                  </form>
-                </div>
-                <div className="flex-1" />
-              </div>
-            );
-          }
-
-          if (false && otpMode) {
-  return (
-    <div className="h-full w-full bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-slate-950 border border-slate-800 rounded-3xl w-full max-w-sm p-6 space-y-4">
-
-        <h3 className="text-white text-center font-black">
-          XÁC THỰC OTP QUA EMAIL
-        </h3>
-
-        {loginError && (
-          <div className="text-red-400 text-xs">
-            {loginError}
-          </div>
-        )}
-
-        <form onSubmit={handleVerifyOtp} className="space-y-4">
-
-          <input
-            type="text"
-            value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value)}
-            placeholder="Nhập mã OTP"
-            className="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 text-white"
-          />
-
-          <button
-            type="submit"
-            className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold"
-          >
-            Xác nhận OTP
-          </button>
-
-        </form>
-
-      </div>
-    </div>
-  );
-}
+          
+          
           if (showRegisterForm) {
             return (
               <div 
