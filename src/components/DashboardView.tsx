@@ -610,7 +610,7 @@ export default function DashboardView({
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-medium cursor-pointer"
             >
               <option value="all">Tất cả tổ</option>
-              {Array.from({ length: 10 }, (_, i) => `Tổ ${i + 1}`).map(val => (
+              {Array.from({ length: 50 }, (_, i) => `Tổ ${i + 1}`).map(val => (
                 <option key={val} value={val}>{val}</option>
               ))}
             </select>

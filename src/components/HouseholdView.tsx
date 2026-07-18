@@ -1241,10 +1241,15 @@ export default function HouseholdView({
                       </span>
                     </p>
                     <p><b>Thời điểm đăng ký:</b> {selectedHousehold.createdAt}</p>
-                    <p><b>Số CMND cũ chủ hộ:</b> <span className="font-mono">{selectedHousehold.ownerOldCmnd || residents.find(r => r.id === selectedHousehold.ownerId)?.oldCmnd || "Chưa cập nhật"}</span></p>
-                  </div>
+                    <p>
+  <strong>Số CMND cũ chủ hộ:</strong>{" "}
+  <span className="font-mono">
+    {selectedHousehold.ownerOldCmnd ||
+      residents.find(r => r.id === selectedHousehold.ownerId)?.oldCmnd ||
+      "Không có"}
+  </span>
+</p>
                 </div>
-
                 {selectedHousehold.photoUrl ? (
                   <div className="rounded-lg overflow-hidden border border-slate-200 h-28 relative">
                     <img src={selectedHousehold.photoUrl} alt="Mặt tiền nhà hộ dân" className="w-full h-full object-cover" />
@@ -1531,10 +1536,10 @@ export default function HouseholdView({
                       onChange={(e) => setFormWard(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-emerald-600 bg-white"
                     >
-                      {Array.from({ length: 10 }, (_, i) => `Tổ ${i + 1}`).map(val => (
+                      {Array.from({ length: 50 }, (_, i) => `Tổ ${i + 1}`).map(val => (
                         <option key={val} value={val}>{val}</option>
                       ))}
-                      {formWard && !Array.from({ length: 10 }, (_, i) => `Tổ ${i + 1}`).includes(formWard) && (
+                      {formWard && !Array.from({ length: 50 }, (_, i) => `Tổ ${i + 1}`).includes(formWard) && (
                         <option value={formWard}>{formWard}</option>
                       )}
                     </select>
