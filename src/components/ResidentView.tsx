@@ -13,6 +13,7 @@ import { Resident, Gender, ResidentStatus, EducationLevel, LaborSector, User, Us
 import { CameraCaptureModal } from "./CameraCaptureModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import { CccdQrScannerModal } from "./CccdQrScannerModal";
+import GoogleMapsPickerModal from "./GoogleMapsPickerModal";
 
 interface ResidentViewProps {
   residents: Resident[];
@@ -113,6 +114,7 @@ export default function ResidentView({
   const [isScanningGps, setIsScanningGps] = useState(false);
   const [simulatingCamera, setSimulatingCamera] = useState(false);
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const [isMapsPickerOpen, setIsMapsPickerOpen] = useState(false);
 
   // Filtered residents
   const activeResidents = residents.filter(r => r.occupation !== "Đã qua đời");
@@ -228,76 +230,24 @@ export default function ResidentView({
     setIsFormOpen(true);
   };
 
-  // Map any coordinate into the Phường Bình Minh, Tây Ninh boundary
-  const mapToBinhMinh = (lat: number, lng: number) => {
-    const minLat = 11.330;
-    const maxLat = 11.365;
-    const minLng = 106.110;
-    const maxLng = 106.145;
-
-    // If already inside, keep it
-    if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
-      return { lat, lng };
-    }
-
-    // Map other provinces/cities (e.g. HCMC ~10.7-10.8, Hanoi ~20.9-21.0, etc.)
-    // proportionally into our sector
-    let latPct = (lat % 0.1) / 0.1;
-    let lngPct = (lng % 0.1) / 0.1;
-
-    if (lat >= 10.0 && lat <= 11.5 && lng >= 106.0 && lng <= 107.0) {
-      latPct = (lat - 10.75) / 0.05;
-      lngPct = (lng - 106.68) / 0.04;
-    } else if (lat >= 20.5 && lat <= 21.5 && lng >= 105.5 && lng <= 106.5) {
-      latPct = (lat - 20.95) / 0.05;
-      lngPct = (lng - 105.78) / 0.05;
-    }
-
-    latPct = Math.min(Math.max(Math.abs(latPct) % 1.0, 0), 1);
-    lngPct = Math.min(Math.max(Math.abs(lngPct) % 1.0, 0), 1);
-
-    const finalLat = minLat + latPct * (maxLat - minLat);
-    const finalLng = minLng + lngPct * (maxLng - minLng);
-
-    return {
-      lat: parseFloat(finalLat.toFixed(6)),
-      lng: parseFloat(finalLng.toFixed(6))
-    };
-  };
-
-  // Scan GPS Coordinates (using browser API with reliable Vietnam-center simulated fallback)
   const handleScanGps = () => {
     setIsScanningGps(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { lat, lng } = mapToBinhMinh(position.coords.latitude, position.coords.longitude);
-          setFormGpsLat(String(lat));
-          setFormGpsLng(String(lng));
+          setFormGpsLat(String(Number(position.coords.latitude.toFixed(6))));
+          setFormGpsLng(String(Number(position.coords.longitude.toFixed(6))));
           setIsScanningGps(false);
         },
-        (error) => {
-          // Fallback to high-quality localized Phường Bình Minh, Tây Ninh coordinates
-          const rawLat = 11.330 + Math.random() * 0.035;
-          const rawLng = 106.110 + Math.random() * 0.035;
-          const { lat, lng } = mapToBinhMinh(rawLat, rawLng);
-          setTimeout(() => {
-            setFormGpsLat(String(lat));
-            setFormGpsLng(String(lng));
-            setIsScanningGps(false);
-          }, 800);
+        () => {
+          setIsScanningGps(false);
+          alert("Không lấy được vị trí hiện tại. Hãy cho phép quyền vị trí hoặc chọn trực tiếp trên Google Maps.");
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
-      const rawLat = 11.330 + Math.random() * 0.035;
-      const rawLng = 106.110 + Math.random() * 0.035;
-      const { lat, lng } = mapToBinhMinh(rawLat, rawLng);
-      setTimeout(() => {
-        setFormGpsLat(String(lat));
-        setFormGpsLng(String(lng));
-        setIsScanningGps(false);
-      }, 800);
+      setIsScanningGps(false);
+      alert("Trình duyệt không hỗ trợ định vị. Hãy chọn vị trí trên Google Maps.");
     }
   };
 
@@ -308,7 +258,7 @@ export default function ResidentView({
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === "string") {
-          const img = new Image();
+          const img = new window.Image();
           img.onload = () => {
             let width = img.width;
             let height = img.height;
@@ -1614,15 +1564,23 @@ export default function ResidentView({
                         {formGpsLat && formGpsLng ? `${parseFloat(formGpsLat).toFixed(5)}, ${parseFloat(formGpsLng).toFixed(5)}` : "Chưa cập nhật"}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleScanGps}
-                      disabled={isScanningGps}
-                      className="flex items-center justify-center gap-1.5 w-full py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-xs font-semibold transition-colors cursor-pointer"
-                    >
-                      <MapPin className="w-3.5 h-3.5" />
-                      {isScanningGps ? "Đang dò..." : "Quét GPS Vị trí"}
-                    </button>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setIsMapsPickerOpen(true)}
+                        className="flex items-center justify-center gap-1 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded text-[10px] font-semibold transition-colors cursor-pointer"
+                      >
+                        <MapPin className="w-3.5 h-3.5" /> Chọn bản đồ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleScanGps}
+                        disabled={isScanningGps}
+                        className="flex items-center justify-center gap-1 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded text-[10px] font-semibold transition-colors cursor-pointer disabled:opacity-60"
+                      >
+                        {isScanningGps ? "Đang lấy..." : "Vị trí hiện tại"}
+                      </button>
+                    </div>
                   </div>
 
                   <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex flex-col justify-between min-h-[120px]">
@@ -1716,6 +1674,18 @@ export default function ResidentView({
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
         onScanSuccess={handleCccdScanSuccess}
+      />
+
+      <GoogleMapsPickerModal
+        isOpen={isMapsPickerOpen}
+        initialLat={formGpsLat}
+        initialLng={formGpsLng}
+        onClose={() => setIsMapsPickerOpen(false)}
+        onSelect={({ lat, lng }) => {
+          setFormGpsLat(String(lat));
+          setFormGpsLng(String(lng));
+          setIsMapsPickerOpen(false);
+        }}
       />
     </div>
   );

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   Users, Home, Calendar, Award, Building, Sparkles, FileText, 
   Activity, User, LogOut, ShieldCheck, KeyRound, Smartphone, Check, HelpCircle,
@@ -34,20 +34,8 @@ import MovableChatbox from "./components/MovableChatbox";
 import officialLogo from "./assets/images/logo_phuong_binh_minh_official_1782824466988.png";
 
 export default function App() {
-  const { user, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
-  const [currentUser, setCurrentUser] = useState<UserType | null>(() => {
-    const saved = localStorage.getItem("currentUser");
-
-if (saved) {
-  try {
-    return JSON.parse(saved);
-  } catch (e) {
-    console.error("Failed to parse saved user", e);
-  }
-}
-
-return null;
-  });
+  const { user, loading: authLoading, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
+  const [currentUser, setCurrentUser] = useState<UserType | null>(null);
 
   // Login Form States
   const [loginPhone, setLoginPhone] = useState("");
@@ -68,6 +56,8 @@ return null;
   useState<UserType | null>(null);
   const [expected2FACode, setExpected2FACode] = useState<string>("");
   const [entered2FACode, setEntered2FACode] = useState<string>("");
+  const lastOtpRequestUserId = useRef("");
+  const twoFactorSessionKey = "verified2FAUserId";
   const [showAIChatbox, setShowAIChatbox] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("showAIChatbox") !== "false";
@@ -112,38 +102,47 @@ return null;
     }
   };
 
+  const requestTwoFactorCode = async (potentialUser: UserType) => {
+    setExpected2FACode("");
+    setEntered2FACode("");
+    const response = await fetch("/api/auth/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: potentialUser.username }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Không thể gửi mã 2FA.");
+    setExpected2FACode(data.developmentCode || "");
+  };
+
+  useEffect(() => {
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("passed2FA");
+  }, []);
+
   // Synchronize Google login session with local currentUser state
   useEffect(() => {
     const checkUserAccess = async () => {
       if (sessionStorage.getItem("explicit_logout") === "true") {
         return;
       }
+      if (authLoading) return;
       if (user) {
         const email = user.email || "";
         const displayName = user.displayName || email || "Cán bộ số";
-        const lowerEmail = email.toLowerCase();
-        const adminEmails = ["bhttq3@gmail.com", "tayninhdoimoi@gmail.com", "nguyentanbinh3005@gmail.com"];
 
         let assignedRole: UserRole | null = null;
         let isAuthorized = false;
 
-        if (adminEmails.includes(lowerEmail)) {
-          assignedRole = UserRole.SUPER_ADMIN;
-          isAuthorized = true;
-        } else {
-          try {
-            const res = await fetch("/api/allowed-emails");
-            if (res.ok) {
-              const allowedList: AllowedEmail[] = await res.json();
-              const allowedUser = allowedList.find(a => a.email.toLowerCase() === lowerEmail);
-              if (allowedUser) {
-                assignedRole = allowedUser.role;
-                isAuthorized = true;
-              }
-            }
-          } catch (e) {
-            console.error("Failed to check allowed emails", e);
+        try {
+          const res = await fetch(`/api/auth/session-check?email=${encodeURIComponent(email)}`);
+          if (res.ok) {
+            const access = await res.json();
+            isAuthorized = access.allowed === true;
+            assignedRole = access.role || null;
           }
+        } catch (e) {
+          console.error("Failed to check access list", e);
         }
 
         if (isAuthorized && assignedRole) {
@@ -155,30 +154,20 @@ return null;
             phone: user.phoneNumber || "0900000000"
           };
 
-         
-const is2FAPassed = localStorage.getItem("passed2FA") === "true";
-
-if (is2FAPassed) {
-    setCurrentUser(potentialUser);
-    localStorage.setItem("currentUser", JSON.stringify(potentialUser));
-} else {
-    setPendingUser2FA(potentialUser);
-
-    fetch("/api/auth/send-otp", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        email: email
-      })
-    }).catch(err => {
-      console.error("Send OTP error:", err);
-    });
-
-    setOtpMode(true);
-}
-setLoginError("");
+          if (sessionStorage.getItem(twoFactorSessionKey) === user.uid) {
+            setPendingUser2FA(null);
+            setCurrentUser(potentialUser);
+          } else {
+            setCurrentUser(null);
+            setPendingUser2FA(potentialUser);
+            if (lastOtpRequestUserId.current !== user.uid) {
+              lastOtpRequestUserId.current = user.uid;
+              requestTwoFactorCode(potentialUser).catch((error) => {
+                setLoginError(error.message || "Không thể gửi mã 2FA.");
+              });
+            }
+          }
+          setLoginError("");
         } else {
           setLoginError(`Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`);
           // Call server API to log this unauthorized attempt and trigger an email warning
@@ -192,27 +181,20 @@ setLoginError("");
             console.error("Error calling unauthorized logging", err);
           }
           setCurrentUser(null);
+          setPendingUser2FA(null);
+          sessionStorage.removeItem(twoFactorSessionKey);
           localStorage.removeItem("currentUser");
           await contextLogout();
         }
       } else {
-        // If Google user is null, we do not clear the local session automatically here to prevent infinite redirect loops 
-        // during initial render/hydration or during temporary Google Auth API connection blips.
-        // Session clearance is strictly handled via explicit user logout action or real-time unauthorized detection.
+        setCurrentUser(null);
+        setPendingUser2FA(null);
+        sessionStorage.removeItem(twoFactorSessionKey);
       }
     };
 
     checkUserAccess();
-  }, [user]);
-
-  useEffect(() => {
-  if (currentUser) {
-    localStorage.setItem(
-      "currentUser",
-      JSON.stringify(currentUser)
-    );
-  }
-}, [currentUser]);
+  }, [authLoading, contextLogout, user]);
 
   // Real-time access/revoke and role change checking heartbeat
   useEffect(() => {
@@ -226,18 +208,8 @@ setLoginError("");
           if (!data.allowed) {
             // User was removed or is not allowed anymore! Kick them immediately!
             sessionStorage.setItem("explicit_logout", "true");
+            sessionStorage.removeItem(twoFactorSessionKey);
             setCurrentUser(null);
-            
-
-await fetch("/api/auth/send-otp", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    email: user?.email
-  })
-});
             localStorage.removeItem("currentUser");
             localStorage.removeItem("passed2FA");
             await contextLogout();
@@ -246,7 +218,6 @@ await fetch("/api/auth/send-otp", {
             // Role was modified! Update immediately!
             const updatedUser = { ...currentUser, role: data.role };
             setCurrentUser(updatedUser);
-            localStorage.setItem("currentUser", JSON.stringify(updatedUser));
             alert(`[CẬP NHẬT QUYỀN TRUY CẬP] Vai trò của bạn đã được thay đổi thành: ${data.role === UserRole.SUPER_ADMIN ? "Quản trị viên" : data.role === UserRole.WARD_LEADER ? "Trưởng khu phố" : "Cộng tác viên"}. Hệ thống đã cập nhật phân quyền mới.`);
           }
         }
@@ -554,24 +525,8 @@ await fetch("/api/auth/send-otp", {
     setLoginError("");
     try {
       await contextLogin();
-      const res = await fetch("/api/auth/login", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    role: loginRole
-  })
-});
-
-const data = await res.json();
-
-setCurrentUser(data.user);
-localStorage.setItem(
-  "currentUser",
-  JSON.stringify(data.user)
-);
-      setLoginError("");
+      // The Firebase auth-state listener now checks the server allow-list and starts 2FA.
+      setLoginError("Đang kiểm tra quyền truy cập và gửi mã 2FA...");
     } catch (error: any) {
       const errorStr = (error && error.message) ? String(error.message).toLowerCase() : "";
       const errorCode = (error && error.code) ? String(error.code).toLowerCase() : "";
@@ -690,26 +645,8 @@ localStorage.setItem(
     }
   };
 
-  const handleDemoBypass = async (role?: UserRole) => {
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: role || loginRole })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Không thể đăng nhập bypass.");
-      }
-      const data = await res.json();
-      
-      localStorage.setItem("passed2FA", "true");
-      setCurrentUser(data.user);
-      localStorage.setItem("currentUser", JSON.stringify(data.user));
-      setLoginError("");
-    } catch (err: any) {
-      setLoginError(err.message || "Lỗi đăng nhập.");
-    }
+  const handleDemoBypass = async () => {
+    setLoginError("Đăng nhập mô phỏng đã bị tắt. Vui lòng đăng nhập bằng tài khoản Google được cấp quyền.");
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
@@ -795,45 +732,13 @@ localStorage.setItem(
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    sessionStorage.removeItem("explicit_logout");
-    setLoginError("");
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-  email: otpUser?.username || user?.email,
-  otp: otpCode,
-  role: loginRole
-})
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Mã OTP không chính xác.");
-      }
-      const data = await res.json();
-      
-      localStorage.setItem("passed2FA", "true");
-
-setCurrentUser(data.user);
-setPendingUser2FA(null);
-
-localStorage.setItem(
-  "currentUser",
-  JSON.stringify(data.user)
-);
-
-setLoginError("");
-setOtpMode(false);
-setOtpCode("");
-
-} catch (err: any) {
-      setLoginError(err.message || "Lỗi xác thực mã OTP.");
-    }
+    setLoginError("Phương thức OTP cũ đã bị tắt. Hãy sử dụng mã 2FA được gửi đến email Google của bạn.");
   };
 
   const handleLogout = async () => {
   sessionStorage.setItem("explicit_logout", "true");
+  sessionStorage.removeItem(twoFactorSessionKey);
+  lastOtpRequestUserId.current = "";
 
   // Xóa toàn bộ state đăng nhập & 2FA
   setCurrentUser(null);

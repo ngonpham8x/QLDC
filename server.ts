@@ -37,7 +37,7 @@ import {
 } from "./src/types.js";
 
 dotenv.config();
-const otpStore = new Map();
+const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -114,7 +114,7 @@ if (fs.existsSync(firebaseConfigPath)) {
   console.warn("firebase-applet-config.json not found. Firestore features will be disabled.");
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number.parseInt(process.env.PORT ?? "3000", 10) || 3000;
 const DATA_FILE_PATH = path.join(process.cwd(), "src", "data_store.json");
 
 // Lazy load Gemini API
@@ -1363,21 +1363,11 @@ app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
     }
   }
 
-  // Strictly enforce single manager and authorized emails list
+  // The access-control list is the only authority for application roles.
   const lowerEmail = email.toLowerCase();
-  let finalRole: UserRole | null = null;
-
-  const adminEmails = ["bhttq3@gmail.com", "tayninhdoimoi@gmail.com", "nguyentanbinh3005@gmail.com"];
-
-  if (adminEmails.includes(lowerEmail)) {
-    finalRole = UserRole.SUPER_ADMIN;
-  } else {
-    const allowedList = db.allowedEmails || [];
-    const allowedUser = allowedList.find(a => a.email.toLowerCase() === lowerEmail);
-    if (allowedUser) {
-      finalRole = allowedUser.role;
-    }
-  }
+  const allowedList = db.allowedEmails || [];
+  const allowedUser = allowedList.find(a => a.email.toLowerCase() === lowerEmail);
+  const finalRole = allowedUser?.role || null;
 
   if (!finalRole) {
     addLog(name || email, UserRole.COLLABORATOR, "CẢNH BÁO: Đăng nhập trái phép", `Tài khoản Google ${email} (Tên hiển thị: ${name || 'Chưa rõ'}) cố gắng đăng nhập hệ thống nhưng bị chặn do chưa được cấp quyền.`);
@@ -1486,32 +1476,66 @@ app.post("/api/users/setup", (req, res) => {
 });
 
 app.post("/api/auth/send-otp", async (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const allowedUser = db.allowedEmails?.find(entry => entry.email.toLowerCase() === email);
+  if (!email || !allowedUser) {
+    return res.status(403).json({ error: "Tài khoản chưa được cấp quyền xác thực 2FA." });
+  }
+
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  otpStore.set(email, { code, expiresAt: Date.now() + 5 * 60 * 1000 });
+
+  const canSendEmail = Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
+  if (canSendEmail) {
+    try {
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: email,
+        subject: "Mã xác thực 2FA - Quản lý dân cư",
+        text: `Mã xác thực của bạn là ${code}. Mã có hiệu lực trong 5 phút. Không chia sẻ mã này cho bất kỳ ai.`,
+      });
+    } catch (error) {
+      otpStore.delete(email);
+      console.error("Không thể gửi email OTP:", error);
+      return res.status(502).json({ error: "Không thể gửi mã 2FA qua email. Vui lòng liên hệ quản trị viên." });
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    otpStore.delete(email);
+    return res.status(503).json({ error: "Máy chủ chưa cấu hình email gửi mã 2FA." });
+  }
+
   return res.json({
     success: true,
-    message: "OTP bypass"
+    message: canSendEmail ? "Mã 2FA đã được gửi đến email của bạn." : "Mã 2FA đang ở chế độ kiểm thử.",
+    developmentCode: canSendEmail ? undefined : code,
   });
 });
 
-// Mock Auth endpoint
-app.post("/api/auth/login", (req, res) => {
-  const { role, email, otp } = req.body;
-  const userRole = role || UserRole.SUPER_ADMIN;
-  
-  let targetEmail = "BHTTQ3@gmail.com";
-  let fullName = "Người quản lý (Admin)";
-  
-  if (userRole === UserRole.WARD_LEADER) {
-    targetEmail = "truongkp@gmail.com";
-    fullName = "Cán bộ Trưởng Khu Phố";
-  } else if (userRole === UserRole.COLLABORATOR) {
-    targetEmail = "ctv@gmail.com";
-    fullName = "Cộng tác viên cơ sở";
+app.post("/api/auth/verify-otp", (req, res) => {
+  const email = String(req.body?.email || "").trim().toLowerCase();
+  const code = String(req.body?.code || "").trim();
+  const record = otpStore.get(email);
+  const allowedUser = db.allowedEmails?.find(entry => entry.email.toLowerCase() === email);
+
+  if (!email || !code || !record || record.expiresAt < Date.now()) {
+    otpStore.delete(email);
+    return res.status(401).json({ error: "Mã 2FA không hợp lệ hoặc đã hết hạn." });
+  }
+  if (!allowedUser) {
+    otpStore.delete(email);
+    return res.status(403).json({ error: "Tài khoản không còn trong danh sách được cấp quyền." });
+  }
+  if (record.code !== code) {
+    return res.status(401).json({ error: "Mã 2FA không chính xác." });
   }
 
-  addLog(targetEmail, userRole, "Đăng nhập", `Đăng nhập thử nghiệm thành công với vai trò ${userRole}`);
-  return res.json({
-    user: { id: "demo-" + userRole.toLowerCase(), username: targetEmail, fullName, role: userRole, phone: "0999999999" }
-  });
+  otpStore.delete(email);
+  return res.json({ success: true, role: allowedUser.role });
+});
+
+// Legacy demo-login endpoint is intentionally disabled: authentication must use Google plus 2FA.
+app.post("/api/auth/login", (req, res) => {
+  return res.status(410).json({ error: "Đăng nhập mô phỏng đã bị tắt. Vui lòng đăng nhập Google và xác thực 2FA." });
 });
 
 // GET session and authorization check for real-time revoke/update
@@ -1522,18 +1546,6 @@ app.get("/api/auth/session-check", (req, res) => {
   }
 
   const lowerEmail = (email as string).toLowerCase().trim();
-
-  // Special system users that are always allowed for testing/production
-  const systemAdmins = ["bhttq3@gmail.com", "tayninhdoimoi@gmail.com", "nguyentanbinh3005@gmail.com", "admin"];
-  if (systemAdmins.includes(lowerEmail)) {
-    return res.json({ allowed: true, role: UserRole.SUPER_ADMIN });
-  }
-  if (lowerEmail === "truongkp@gmail.com") {
-    return res.json({ allowed: true, role: UserRole.WARD_LEADER });
-  }
-  if (lowerEmail === "ctv@gmail.com") {
-    return res.json({ allowed: true, role: UserRole.COLLABORATOR });
-  }
 
   if (!db.allowedEmails) db.allowedEmails = [];
   

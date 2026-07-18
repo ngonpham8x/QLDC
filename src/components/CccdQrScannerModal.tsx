@@ -8,7 +8,7 @@ interface CccdQrScannerModalProps {
   onClose: () => void;
   onScanSuccess: (data: {
     cccd: string;
-    cmnd: string;
+    oldCmnd?: string;
     fullName: string;
     birthDate: string;
     gender: string;
@@ -1208,7 +1208,7 @@ ctx.imageSmoothingEnabled = false;
                   <button
                     id="rescan-btn"
                     type="button"
-                    onClick={startScanner}
+                    onClick={() => startScanner()}
                     className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
                     style={{ display: 'none' }}
                   >
@@ -1220,7 +1220,7 @@ ctx.imageSmoothingEnabled = false;
                       if (scannedResult) {
                         onScanSuccess({
                           cccd: scannedResult.cccd,
-                          cmnd: scannedResult.cmnd,
+                            oldCmnd: scannedResult.cmnd,
                           fullName: scannedResult.fullName,
                           birthDate: scannedResult.birthDate,
                           gender: scannedResult.gender,
