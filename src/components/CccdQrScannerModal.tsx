@@ -684,78 +684,80 @@ ctx.drawImage(
 
   // Robust CCCD QR parser fallback for files or text input
   const handleParseCccdString = (qrString: string) => {
-    if (!qrString || !qrString.includes("|")) {
-      return null;
-    }
-
-    try {
-      const parts = qrString.split("|").map(p => p.trim());
-      if (parts.length < 4) return null;
-
-      const cccd = parts[0] || "";
-
-let oldCmnd = "";
-
-let fullName = "";
-let rawBirth = "";
-let rawGender = "Nam";
-let address = "";
-
-      const isNumeric = (str: string) => /^\d+$/.test(str);
-
-      // Sắp xếp phân tách thông tin dựa trên cấu trúc chuẩn
-      if (parts.length >= 7) {
-        oldCmnd = parts[1] || "";
-
-fullName = parts[2] || "";
-rawBirth = parts[3] || "";
-rawGender = parts[4] || "Nam";
-address = parts[5] || "";
-      } else {
-  if (parts[1] === "" || (parts[1] && isNumeric(parts[1]) && parts[1].length === 9)) {
-
-    oldCmnd = parts[1] || "";
-
-    fullName = parts[2] || "";
-    rawBirth = parts[3] || "";
-    rawGender = parts[4] || "Nam";
-    address = parts[5] || "";
-
-  } else {
-
-    fullName = parts[1] || "";
-    rawBirth = parts[2] || "";
-    rawGender = parts[3] || "Nam";
-    address = parts[4] || "";
-
+  if (!qrString || !qrString.includes("|")) {
+    return null;
   }
-}
 
-      // Minimum validation
-      if (!cccd || !fullName) {
-        return null;
-      }
+  try {
+    const parts = qrString.split("|").map(p => p.trim());
 
-      let birthDate = "";
-      if (rawBirth && rawBirth.length === 8) {
-        const d = rawBirth.substring(0, 2);
-        const m = rawBirth.substring(2, 4);
-        const y = rawBirth.substring(4, 8);
-        birthDate = `${y}-${m}-${d}`;
-      }
+    let cccd = "";
+    let oldCmnd = "";
+    let fullName = "";
+    let rawBirth = "";
+    let rawGender = "";
+    let address = "";
 
-      return {
-        cccd,
-        fullName,
-        birthDate,
-        gender: rawGender,
-        address
-      };
-    } catch (e) {
-      console.error("CCCD QR Parse fallback error:", e);
+    // CCCD mới có CMND cũ
+    if (
+      parts.length >= 7 &&
+      /^\d{12}$/.test(parts[0]) &&
+      /^\d{9}$/.test(parts[1])
+    ) {
+      cccd = parts[0];
+      oldCmnd = parts[1];
+      fullName = parts[2];
+      rawBirth = parts[3];
+      rawGender = parts[4];
+      address = parts[5];
+    }
+
+    // CCCD mới không có CMND cũ
+    else if (
+      parts.length >= 6 &&
+      /^\d{12}$/.test(parts[0])
+    ) {
+      cccd = parts[0];
+      fullName = parts[1];
+      rawBirth = parts[2];
+      rawGender = parts[3];
+      address = parts[4];
+    }
+
+    // QR cũ
+    else {
+      cccd = parts[0] || "";
+      fullName = parts[1] || "";
+      rawBirth = parts[2] || "";
+      rawGender = parts[3] || "";
+      address = parts[4] || "";
+    }
+
+    if (!cccd || !fullName) {
       return null;
     }
-  };
+
+    let birthDate = "";
+
+    if (rawBirth.length === 8) {
+      birthDate =
+        `${rawBirth.substring(4,8)}-${rawBirth.substring(2,4)}-${rawBirth.substring(0,2)}`;
+    }
+
+    return {
+      cccd,
+      oldCmnd,
+      fullName,
+      birthDate,
+      gender: rawGender,
+      address
+    };
+
+  } catch (e) {
+    console.error("CCCD QR Parse error:", e);
+    return null;
+  }
+};
 
   // Drag and drop events
   const handleDrag = (e: React.DragEvent) => {

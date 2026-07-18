@@ -462,15 +462,15 @@ export default function ResidentView({
   };
 
   const handleCccdScanSuccess = (data: {
-    cccd: string;
-    cmnd: string;
-    fullName: string;
-    birthDate: string;
-    gender: string;
-    address: string;
-  }) => {
+  cccd: string;
+  oldCmnd?: string;
+  fullName: string;
+  birthDate: string;
+  gender: string;
+  address: string;
+}) => {
     setFormId(data.cccd);
-    setFormOldCmnd(data.cmnd || "");
+    setFormOldCmnd(data.oldCmnd || "");
     setFormFullName(data.fullName);
     setFormBirthDate(data.birthDate);
     
@@ -1350,7 +1350,7 @@ export default function ResidentView({
                     onChange={(e) => setFormWardId(e.target.value)}
                     className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 bg-emerald-50 border-emerald-300 font-semibold focus:outline-emerald-600"
                   >
-                    {Array.from({ length: 10 }, (_, i) => `Tổ ${i + 1}`).map(val => (
+                    {Array.from({ length: 50 }, (_, i) => `Tổ ${i + 1}`).map(val => (
                       <option key={val} value={val}>{val}</option>
                     ))}
                   </select>
