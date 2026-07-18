@@ -1857,7 +1857,7 @@ setOtpCode("");
         reportTitle = "Danh sách Nhân khẩu Chi tiết KDC";
         headers = [
           "STT", "Mã Hộ Gia Đình", "Họ và Tên", "Quan Hệ Chủ Hộ", "Giới Tính", 
-          "Ngày Sinh", "Số CCCD", "Trạng Thái Cư Trú", "Dân Tộc", "Tôn Giáo", 
+          "Ngày Sinh", "Số CCCD", "Số CMND cũ", "Trạng Thái Cư Trú", "Dân Tộc", "Tôn Giáo",
           "Trình Độ Học Vấn", "Nghề Nghiệp", "Nơi Làm Việc", "Số Điện Thoại", "Mã Số BHYT",
           "Người Cao Tuổi", "Khuyết Tật", "Mang Thai", "Học Sinh/Sinh Viên", "Loại Học Sinh",
           "Có Việc Làm", "Lĩnh Vực Lao Động", "Trợ Cấp"
@@ -1871,6 +1871,7 @@ setOtpCode("");
           r.gender,
           r.birthDate,
           `'${r.id}`,
+          r.oldCmnd || "",
           r.status,
           r.ethnicity,
           r.religion,
@@ -1891,7 +1892,7 @@ setOtpCode("");
       } else if (titleOrEntity === "households") {
         reportTitle = "Danh sách Hộ gia đình Chi tiết";
         headers = [
-          "STT", "Mã Hộ Gia Đình", "Mã CCCD Chủ Hộ", "Họ Tên Chủ Hộ", "Số ĐT Chủ Hộ", "Địa Chỉ", 
+          "STT", "Mã Hộ Gia Đình", "Mã CCCD Chủ Hộ", "Số CMND cũ Chủ Hộ", "Họ Tên Chủ Hộ", "Số ĐT Chủ Hộ", "Địa Chỉ",
           "Tổ Dân Phố", "Khu Phố", "Ngày Lập Hộ", "Phân Loại Hộ", "Gia Đình Văn Hoá",
           "Gia Đình Chính Sách", "Gia Đình Có Công", "Nước Sạch", "Thu Gom Rác", "Hộ Nông Nghiệp", "Vĩ Độ (Lat)", "Kinh Độ (Lng)",
           "Ghi Chú"
@@ -1904,6 +1905,7 @@ setOtpCode("");
             idx + 1,
             h.id,
             `'${h.ownerId}`,
+            h.ownerOldCmnd || ownerResident?.oldCmnd || "",
             h.ownerName,
             ownerPhone,
             h.address,
@@ -2997,11 +2999,18 @@ if (user) {
                       {currentUser.fullName.split(" ").pop()?.substring(0, 2) || "CB"}
                     </div>
                     <div className="flex flex-col min-w-0 leading-tight">
-                      <span className="text-[10px] font-bold text-white truncate max-w-[100px]">{currentUser.fullName}</span>
-                      <span className="text-[8px] text-blue-400 font-bold uppercase tracking-wider">
-                        {currentUser.role === UserRole.SUPER_ADMIN ? "Quản trị viên" : currentUser.role === UserRole.WARD_LEADER ? "Trưởng khu" : "Cộng tác viên"}
-                      </span>
-                    </div>
+  <span className="text-[11px] font-extrabold text-white uppercase">
+    {currentUser.fullName}
+  </span>
+
+  <span className="text-[8px] text-cyan-400 font-bold uppercase tracking-wider">
+    {currentUser.role === UserRole.SUPER_ADMIN
+      ? "QUẢN TRỊ VIÊN"
+      : currentUser.role === UserRole.WARD_LEADER
+      ? "TRƯỞNG KHU PHỐ"
+      : "CỘNG TÁC VIÊN"}
+  </span>
+</div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">

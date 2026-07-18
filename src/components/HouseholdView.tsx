@@ -180,6 +180,7 @@ export default function HouseholdView({
 
   // Detailed Owner Resident States
   const [ownerCccd, setOwnerCccd] = useState("");
+  const [ownerOldCmnd, setOwnerOldCmnd] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const [ownerBirthDate, setOwnerBirthDate] = useState("");
   const [ownerGender, setOwnerGender] = useState<Gender>(Gender.MALE);
@@ -208,6 +209,7 @@ export default function HouseholdView({
     const matchesSearch = 
       h.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) || 
       h.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (h.ownerOldCmnd || residents.find(r => r.id === h.ownerId)?.oldCmnd || "").includes(searchQuery) ||
       h.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
       !!matchesCustomFields;
     const matchesStatus = statusFilter === "ALL" || h.status === statusFilter;
@@ -232,6 +234,7 @@ export default function HouseholdView({
 
   const handleCccdScanSuccess = (data: {
     cccd: string;
+    cmnd: string;
     fullName: string;
     birthDate: string;
     gender: string;
@@ -239,6 +242,7 @@ export default function HouseholdView({
   }) => {
     setFormOwnerName(data.fullName);
     setOwnerCccd(data.cccd);
+    setOwnerOldCmnd(data.cmnd || "");
     setFormOwnerId(data.cccd);
     setOwnerBirthDate(data.birthDate);
     
@@ -285,6 +289,7 @@ export default function HouseholdView({
 
     // Reset owner resident fields
     setOwnerCccd("");
+    setOwnerOldCmnd("");
     setOwnerPhone("");
     setOwnerBirthDate("");
     setOwnerGender(Gender.MALE);
@@ -334,6 +339,7 @@ export default function HouseholdView({
     const ownerRes = residents.find(r => r.id === h.ownerId || (r.fullName === h.ownerName && r.relationToOwner === "Chủ hộ" && r.householdId === h.id));
     if (ownerRes) {
       setOwnerCccd(ownerRes.id);
+      setOwnerOldCmnd(ownerRes.oldCmnd || h.ownerOldCmnd || "");
       setOwnerPhone(ownerRes.phone || "");
       setOwnerBirthDate(ownerRes.birthDate || "");
       setOwnerGender(ownerRes.gender || Gender.MALE);
@@ -349,6 +355,7 @@ export default function HouseholdView({
       setOwnerPermanentAddress(ownerRes.permanentAddress || "");
     } else {
       setOwnerCccd(h.ownerId || "");
+      setOwnerOldCmnd(h.ownerOldCmnd || "");
       setOwnerPhone("");
       setOwnerBirthDate("");
       setOwnerGender(Gender.MALE);
@@ -502,6 +509,7 @@ export default function HouseholdView({
     const householdData: Household = {
       id: formId,
       ownerId: finalOwnerId,
+      ownerOldCmnd: ownerOldCmnd.trim() || undefined,
       ownerName: formOwnerName,
       address: formAddress,
       wardId: formWard,
@@ -525,6 +533,7 @@ export default function HouseholdView({
 
     const ownerResidentData: Resident = {
       id: finalOwnerId,
+      oldCmnd: ownerOldCmnd.trim() || undefined,
       fullName: formOwnerName,
       birthDate: ownerBirthDate,
       gender: ownerGender,
@@ -586,13 +595,14 @@ export default function HouseholdView({
     const customKeysArray = Array.from(customKeys);
 
     const headers = [
-      "STT", "Mã Hộ", "CCCD Chủ Hộ", "Họ Tên Chủ Hộ", "Số ĐT Chủ Hộ", "Địa Chỉ", "Tổ dân phố", 
+      "STT", "Mã Hộ", "CCCD Chủ Hộ", "Số CMND cũ Chủ Hộ", "Họ Tên Chủ Hộ", "Số ĐT Chủ Hộ", "Địa Chỉ", "Tổ dân phố",
       "Phân Loại Thế Hệ", "Ngày Tạo", "Trạng Thái", "Nước Sạch", "Thu Gom Rác", "Hộ Nông Nghiệp", "Ghi Chú",
       ...customKeysArray
     ];
     const rows = filteredHouseholds.map((h, idx) => {
       const ownerResident = residents.find(r => r.id === h.ownerId);
       const ownerPhone = ownerResident?.phone || "";
+      const ownerOldCmnd = h.ownerOldCmnd || ownerResident?.oldCmnd || "";
       const customValues = customKeysArray.map(k => (h.customFields?.[k] || ""));
       const genType = getHouseholdGenerationType(h, residents);
       const genLabel = getGenerationLabel(genType);
@@ -600,6 +610,7 @@ export default function HouseholdView({
         idx + 1,
         h.id,
         h.ownerId,
+        ownerOldCmnd,
         h.ownerName,
         ownerPhone,
         h.address,
@@ -1230,6 +1241,7 @@ export default function HouseholdView({
                       </span>
                     </p>
                     <p><b>Thời điểm đăng ký:</b> {selectedHousehold.createdAt}</p>
+                    <p><b>Số CMND cũ chủ hộ:</b> <span className="font-mono">{selectedHousehold.ownerOldCmnd || residents.find(r => r.id === selectedHousehold.ownerId)?.oldCmnd || "Chưa cập nhật"}</span></p>
                   </div>
                 </div>
 
@@ -1290,6 +1302,7 @@ export default function HouseholdView({
                         <div className="text-xs text-slate-500 mt-1 space-y-0.5">
                           <p>Ngày sinh: {member.birthDate} | Giới tính: {member.gender}</p>
                           <p>CCCD/Mã định danh: <span className="font-mono font-medium">{member.id}</span></p>
+                          {member.oldCmnd && <p>Số CMND cũ: <span className="font-mono font-medium">{member.oldCmnd}</span></p>}
                           <p>Nghề nghiệp: {member.occupation || "N/A"} | BHYT: {member.insuranceId ? "Đã cấp" : "Chưa đăng ký"}</p>
                         </div>
                       </div>
@@ -1410,6 +1423,18 @@ export default function HouseholdView({
                       value={ownerCccd}
                       onChange={(e) => setOwnerCccd(e.target.value)}
                       className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-emerald-600 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Số CMND cũ</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={9}
+                      placeholder="123456789"
+                      value={ownerOldCmnd}
+                      onChange={(e) => setOwnerOldCmnd(e.target.value.replace(/\D/g, ""))}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-emerald-600 bg-white font-mono"
                     />
                   </div>
                   <div>

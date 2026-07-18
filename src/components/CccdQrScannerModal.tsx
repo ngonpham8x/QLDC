@@ -8,6 +8,7 @@ interface CccdQrScannerModalProps {
   onClose: () => void;
   onScanSuccess: (data: {
     cccd: string;
+    cmnd: string;
     fullName: string;
     birthDate: string;
     gender: string;
@@ -692,32 +693,43 @@ ctx.drawImage(
       if (parts.length < 4) return null;
 
       const cccd = parts[0] || "";
-      let fullName = "";
-      let rawBirth = "";
-      let rawGender = "Nam";
-      let address = "";
+
+let oldCmnd = "";
+
+let fullName = "";
+let rawBirth = "";
+let rawGender = "Nam";
+let address = "";
 
       const isNumeric = (str: string) => /^\d+$/.test(str);
 
       // Sắp xếp phân tách thông tin dựa trên cấu trúc chuẩn
       if (parts.length >= 7) {
-        fullName = parts[2] || "";
-        rawBirth = parts[3] || "";
-        rawGender = parts[4] || "Nam";
-        address = parts[5] || "";
+        oldCmnd = parts[1] || "";
+
+fullName = parts[2] || "";
+rawBirth = parts[3] || "";
+rawGender = parts[4] || "Nam";
+address = parts[5] || "";
       } else {
-        if (parts[1] === "" || (parts[1] && isNumeric(parts[1]) && parts[1].length === 9)) {
-          fullName = parts[2] || "";
-          rawBirth = parts[3] || "";
-          rawGender = parts[4] || "Nam";
-          address = parts[5] || "";
-        } else {
-          fullName = parts[1] || "";
-          rawBirth = parts[2] || "";
-          rawGender = parts[3] || "Nam";
-          address = parts[4] || "";
-        }
-      }
+  if (parts[1] === "" || (parts[1] && isNumeric(parts[1]) && parts[1].length === 9)) {
+
+    oldCmnd = parts[1] || "";
+
+    fullName = parts[2] || "";
+    rawBirth = parts[3] || "";
+    rawGender = parts[4] || "Nam";
+    address = parts[5] || "";
+
+  } else {
+
+    fullName = parts[1] || "";
+    rawBirth = parts[2] || "";
+    rawGender = parts[3] || "Nam";
+    address = parts[4] || "";
+
+  }
+}
 
       // Minimum validation
       if (!cccd || !fullName) {
@@ -1206,6 +1218,7 @@ ctx.imageSmoothingEnabled = false;
                       if (scannedResult) {
                         onScanSuccess({
                           cccd: scannedResult.cccd,
+                          cmnd: scannedResult.cmnd,
                           fullName: scannedResult.fullName,
                           birthDate: scannedResult.birthDate,
                           gender: scannedResult.gender,

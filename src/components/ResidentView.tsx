@@ -71,6 +71,7 @@ export default function ResidentView({
 
   // Form Fields
   const [formId, setFormId] = useState(""); // CCCD / Personal ID
+  const [formOldCmnd, setFormOldCmnd] = useState("");
   const [formFullName, setFormFullName] = useState("");
   const [formBirthDate, setFormBirthDate] = useState("");
   const [formGender, setFormGender] = useState<Gender>(Gender.MALE);
@@ -124,6 +125,7 @@ export default function ResidentView({
     const matchesSearch = 
       r.fullName.toLowerCase().includes(searchQuery.toLowerCase()) || 
       r.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.oldCmnd || "").includes(searchQuery) ||
       (r.phone && r.phone.includes(searchQuery)) ||
       (hh && hh.address.toLowerCase().includes(searchQuery.toLowerCase())) ||
       !!matchesCustomFields;
@@ -146,6 +148,7 @@ export default function ResidentView({
     setFormMode("add");
     setIsZoomed(false);
     setFormId("");
+    setFormOldCmnd("");
     setFormFullName("");
     setFormBirthDate("");
     setFormGender(Gender.MALE);
@@ -185,6 +188,7 @@ export default function ResidentView({
     setFormMode("edit");
     setIsZoomed(false);
     setFormId(r.id);
+    setFormOldCmnd(r.oldCmnd || "");
     setFormFullName(r.fullName);
     setFormBirthDate(r.birthDate);
     setFormGender(r.gender);
@@ -373,6 +377,7 @@ export default function ResidentView({
 
     const residentData: Resident = {
       id: formId,
+      oldCmnd: formOldCmnd.trim() || undefined,
       fullName: formFullName,
       birthDate: formBirthDate,
       gender: formGender,
@@ -458,12 +463,14 @@ export default function ResidentView({
 
   const handleCccdScanSuccess = (data: {
     cccd: string;
+    cmnd: string;
     fullName: string;
     birthDate: string;
     gender: string;
     address: string;
   }) => {
     setFormId(data.cccd);
+    setFormOldCmnd(data.cmnd || "");
     setFormFullName(data.fullName);
     setFormBirthDate(data.birthDate);
     
@@ -492,7 +499,7 @@ export default function ResidentView({
     const customKeysArray = Array.from(customKeys);
 
     const headers = [
-      "STT", "Họ tên", "Số CCCD", "Ngày sinh", "Tuổi", "Giới tính", 
+      "STT", "Họ tên", "Số CCCD", "Số CMND cũ", "Ngày sinh", "Tuổi", "Giới tính",
       "Quan hệ", "Số điện thoại", "Cư trú", "Tổ dân phố", "ĐC Thường Trú", "ĐC Tạm Trú", "Học vấn", "Nghề nghiệp", "Mã Hộ",
       ...customKeysArray
     ];
@@ -502,6 +509,7 @@ export default function ResidentView({
         idx + 1,
         r.fullName,
         r.id,
+        r.oldCmnd || "",
         r.birthDate,
         getAge(r.birthDate),
         r.gender,
@@ -684,6 +692,7 @@ export default function ResidentView({
                   <th className="px-4 py-3">Ngày Sinh</th>
                   <th className="px-4 py-3 text-center">Tuổi</th>
                   <th className="px-4 py-3">Số CCCD</th>
+                  <th className="px-4 py-3">Số CMND cũ</th>
                   <th className="px-4 py-3">Cư Trú</th>
                   <th className="px-4 py-3">Tổ dân phố</th>
                   <th className="px-4 py-3">ĐC Thường Trú</th>
@@ -733,6 +742,7 @@ export default function ResidentView({
                       <td className="px-4 py-3 text-slate-500 font-mono">{formatDate(r.birthDate)}</td>
                       <td className="px-4 py-3 text-center font-semibold text-slate-700 font-mono">{getAge(r.birthDate)}</td>
                       <td className="px-4 py-3 font-mono text-slate-700">{r.id}</td>
+                      <td className="px-4 py-3 font-mono text-slate-700">{r.oldCmnd || "-"}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
                           r.status === ResidentStatus.PERMANENT 
@@ -793,7 +803,7 @@ export default function ResidentView({
 
                 {filteredResidents.length === 0 && (
                   <tr>
-                    <td colSpan={15} className="p-8 text-center text-slate-400">
+                    <td colSpan={16} className="p-8 text-center text-slate-400">
                       Không tìm thấy dữ liệu nhân khẩu trùng khớp với điều kiện lọc.
                     </td>
                   </tr>
@@ -868,6 +878,10 @@ export default function ResidentView({
                     <div>
                       <span className="block text-[9px] font-bold text-slate-400 uppercase">Số CCCD</span>
                       <span className="font-mono text-slate-700 font-semibold">{r.id}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase">Số CMND cũ</span>
+                      <span className="font-mono text-slate-700 font-semibold">{r.oldCmnd || "-"}</span>
                     </div>
                     <div>
                       <span className="block text-[9px] font-bold text-slate-400 uppercase">Ngày sinh (Tuổi)</span>
@@ -978,6 +992,10 @@ export default function ResidentView({
                 <div>
                   <p className="font-bold text-slate-400 uppercase text-[9px] tracking-wider">Số CCCD / CMND</p>
                   <p className="text-sm font-semibold text-slate-800 mt-1 font-mono">{selectedResident.id}</p>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-400 uppercase text-[9px] tracking-wider">Số CMND cũ</p>
+                  <p className="text-sm font-semibold text-slate-800 mt-1 font-mono">{selectedResident.oldCmnd || "Chưa cập nhật"}</p>
                 </div>
               </div>
 
@@ -1253,6 +1271,18 @@ export default function ResidentView({
                     disabled={formMode === "edit"}
                     onChange={(e) => setFormId(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-emerald-600 font-mono disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Số CMND cũ</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={9}
+                    placeholder="123456789"
+                    value={formOldCmnd}
+                    onChange={(e) => setFormOldCmnd(e.target.value.replace(/\D/g, ""))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-emerald-600 font-mono"
                   />
                 </div>
               </div>

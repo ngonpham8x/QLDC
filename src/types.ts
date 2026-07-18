@@ -85,6 +85,7 @@ export interface User {
 export interface Household {
   id: string; // Mã hộ gia đình (e.g. Hộ-10023)
   ownerId: string; // Mã nhân khẩu của chủ hộ
+  ownerOldCmnd?: string; // Số CMND cũ của chủ hộ
   ownerName: string; // Tên chủ hộ lưu nhanh
   address: string;
   wardId: string; // Tổ dân phố (e.g. Tổ 5)
@@ -108,6 +109,7 @@ export interface Household {
 
 export interface Resident {
   id: string; // Mã định danh / CCCD
+  oldCmnd?: string; // Số CMND 9 số cũ (nếu có)
   fullName: string;
   birthDate: string;
   gender: Gender;

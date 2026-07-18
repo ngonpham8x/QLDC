@@ -2321,6 +2321,7 @@ app.post("/api/residents", (req, res) => {
     if (hIndex !== -1) {
       db.households[hIndex].ownerId = newResident.id;
       db.households[hIndex].ownerName = newResident.fullName;
+      db.households[hIndex].ownerOldCmnd = newResident.oldCmnd;
       saveToFirestore("households", db.households[hIndex]);
     }
   }
@@ -2352,11 +2353,12 @@ app.put("/api/residents/:id", (req, res) => {
     }
     db.residents[index] = { ...oldResident, ...bodyData };
     
-    // Update owner name in household if this resident is the owner
-    if (db.residents[index].relationToOwner === "Chủ hộ" && oldResident.fullName !== db.residents[index].fullName) {
+    // Keep household owner details in sync with the linked resident record.
+    if (db.residents[index].relationToOwner === "Chủ hộ") {
       const hIndex = db.households.findIndex(h => h.id === db.residents[index].householdId);
       if (hIndex !== -1) {
         db.households[hIndex].ownerName = db.residents[index].fullName;
+        db.households[hIndex].ownerOldCmnd = db.residents[index].oldCmnd;
         saveToFirestore("households", db.households[hIndex]);
       }
     }
@@ -2567,20 +2569,20 @@ app.get("/api/export", (req, res) => {
     const worksheetData: any[][] = [];
     
     if (entity === "residents") {
-      worksheetData.push(["STT", "MÃ HỘ", "HỌ VÀ TÊN", "QUAN HỆ CHỦ HỘ", "NAM/NỮ", "NGÀY SINH", "SỐ CCCD", "TẠM TRÚ/THƯỜNG TRÚ", "NGHỀ NGHIỆP", "SỐ ĐIỆN THOẠI", "ĐỊA CHỈ THƯỜNG TRÚ"]);
+      worksheetData.push(["STT", "MÃ HỘ", "HỌ VÀ TÊN", "QUAN HỆ CHỦ HỘ", "NAM/NỮ", "NGÀY SINH", "SỐ CCCD", "Số CMND cũ", "TẠM TRÚ/THƯỜNG TRÚ", "NGHỀ NGHIỆP", "SỐ ĐIỆN THOẠI", "ĐỊA CHỈ THƯỜNG TRÚ"]);
       db.residents.forEach((r, idx) => {
         const hh = db.households.find(h => h.id === r.householdId);
-        worksheetData.push([idx + 1, r.householdId || "N/A", r.fullName, r.relationToOwner, r.gender, r.birthDate, `'${r.id}`, r.status, r.occupation, r.phone || "", hh ? hh.address : ""]);
+        worksheetData.push([idx + 1, r.householdId || "N/A", r.fullName, r.relationToOwner, r.gender, r.birthDate, `'${r.id}`, r.oldCmnd || "", r.status, r.occupation, r.phone || "", hh ? hh.address : ""]);
       });
     } else if (entity === "households") {
-      worksheetData.push(["STT", "MÃ HỘ", "HỌ TÊN CHỦ HỘ", "TỔ DÂN PHỐ", "KHU PHỐ", "ĐỊA CHỈ", "TÌNH TRẠNG HỘ", "PHÂN LOẠI GIA ĐÌNH", "HỘ NÔNG NGHIỆP"]);
+      worksheetData.push(["STT", "MÃ HỘ", "HỌ TÊN CHỦ HỘ", "Số CMND cũ Chủ Hộ", "TỔ DÂN PHỐ", "KHU PHỐ", "ĐỊA CHỈ", "TÌNH TRẠNG HỘ", "PHÂN LOẠI GIA ĐÌNH", "HỘ NÔNG NGHIỆP"]);
       db.households.forEach((h, idx) => {
         const familyTags = [
           h.isCulturalFamily ? "Văn hoá" : "",
           h.isPolicyFamily ? "Chính sách" : "",
           h.isMeritoriousFamily ? "Có công" : ""
         ].filter(Boolean).join(" - ") || "Bình thường";
-        worksheetData.push([idx + 1, h.id, h.ownerName, h.wardId, h.quarterId, h.address, h.status, familyTags, h.housingType]);
+        worksheetData.push([idx + 1, h.id, h.ownerName, h.ownerOldCmnd || db.residents.find(r => r.id === h.ownerId)?.oldCmnd || "", h.wardId, h.quarterId, h.address, h.status, familyTags, h.housingType]);
       });
     } else {
       worksheetData.push(["Chỉ tiêu thống kê", "Số lượng", "Tỷ lệ (%)"]);
@@ -2607,11 +2609,11 @@ app.get("/api/export", (req, res) => {
     content = `CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc\n\nBÁO CÁO CHI TIẾT DANH SÁCH: ${entity?.toString().toUpperCase()}\nNgày xuất: ${new Date().toLocaleDateString("vi-VN")}\n\n`;
     if (entity === "residents") {
       db.residents.forEach((r, idx) => {
-        content += `${idx + 1}. Họ tên: ${r.fullName} | Ngày sinh: ${r.birthDate} | Giới tính: ${r.gender} | Số định danh/CCCD: ${r.id} | Trạng thái: ${r.status}\n`;
+        content += `${idx + 1}. Họ tên: ${r.fullName} | Ngày sinh: ${r.birthDate} | Giới tính: ${r.gender} | Số định danh/CCCD: ${r.id} | Số CMND cũ: ${r.oldCmnd || "Không có"} | Trạng thái: ${r.status}\n`;
       });
     } else {
       db.households.forEach((h, idx) => {
-        content += `${idx + 1}. Mã hộ: ${h.id} | Chủ hộ: ${h.ownerName} | Địa chỉ: ${h.address} | Tình trạng: ${h.status}\n`;
+        content += `${idx + 1}. Mã hộ: ${h.id} | Chủ hộ: ${h.ownerName} | Số CMND cũ chủ hộ: ${h.ownerOldCmnd || db.residents.find(r => r.id === h.ownerId)?.oldCmnd || "Không có"} | Địa chỉ: ${h.address} | Tình trạng: ${h.status}\n`;
       });
     }
   } else {
@@ -2647,6 +2649,7 @@ app.get("/api/export", (req, res) => {
               <th>Ngày Sinh</th>
               <th>Giới Tính</th>
               <th>Số CCCD/Định Danh</th>
+              <th>Số CMND cũ</th>
               <th>Quan Hệ Chủ Hộ</th>
               <th>Địa Chỉ Thường Trú</th>
             </tr>
@@ -2659,6 +2662,7 @@ app.get("/api/export", (req, res) => {
                 <td>${r.birthDate}</td>
                 <td>${r.gender}</td>
                 <td>${r.id}</td>
+                <td>${r.oldCmnd || ""}</td>
                 <td>${r.relationToOwner}</td>
                 <td>${db.households.find(h => h.id === r.householdId)?.address || "Không rõ"}</td>
               </tr>
