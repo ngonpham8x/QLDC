@@ -6776,7 +6776,7 @@
       "userRole": "Quản trị viên",
       "id": "LOG-1784360871965",
       "userName": "BHTTQ3@gmail.com",
-      "userId": "BHTTQ3@gmail.com",
+      "userId": "QTV HE THON",
       "timestamp": "2026-07-18T07:47:51.965Z",
       "action": "Đăng nhập"
     },
@@ -6802,7 +6802,7 @@
       "action": "Đăng nhập",
       "timestamp": "2026-07-18T08:01:33.901Z",
       "userName": "BHTTQ3@gmail.com",
-      "userId": "BHTTQ3@gmail.com",
+      "userId": "QTV HE THONG",
       "id": "LOG-1784361693901",
       "details": "Đăng nhập thử nghiệm thành công với vai trò Quản trị viên",
       "userRole": "Quản trị viên"
@@ -6912,8 +6912,15 @@
       "assignedBy": "Người quản lý",
       "email": "tayninhdoimoi@gmail.com",
       "id": "ALLOW-1783169280863",
-      "role": "Trưởng khu phố",
+      "role": "Quản trị viên",
       "assignedAt": "2026-07-04T12:48:00.863Z"
+    },
+    {
+      "assignedBy": "Người quản lý",
+      "email": "BHTTQ3@gmail.com",
+      "id": "ALLOW-1783169280863",
+      "role": "Quản trị viên",
+      "assignedAt": "2026-07-18T12:48:00.863Z"
     },
     {
       "id": "ALLOW-1783169294892",
@@ -6926,12 +6933,12 @@
       "assignedBy": "Người quản lý",
       "assignedAt": "2026-07-04T12:48:26.320Z",
       "id": "ALLOW-1783169306320",
-      "role": "Trưởng khu phố",
+      "role": "Quản trị viên",
       "email": "nguyentanbinh3005@gmail.com"
     },
     {
       "assignedAt": "2026-07-04T12:48:35.124Z",
-      "role": "Trưởng khu phố",
+      "role": "Quản trị viên",
       "email": "nguyentanbinh30051989@gmail.com",
       "id": "ALLOW-1783169315124",
       "assignedBy": "Người quản lý"
@@ -6939,9 +6946,7 @@
   ],
   "pendingRegistrations": [],
   "dismissedEmails": [
-    "ngonpham8x@gmail.com",
-    "nguyenbinh.tayninh.prograb@gmail.com",
-    "sonngocholtel@gmail.com"
+    
   ],
   "documents": []
 }

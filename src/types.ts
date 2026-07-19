@@ -99,10 +99,15 @@ export interface Household {
   wasteCollectionStatus?: WasteCollectionStatus; // Thu gom rác
   waterSource?: WaterSource; // Nước sạch
   housingType: HousingType;
-  gpsLat?: number;
-  gpsLng?: number;
-  photoUrl?: string;
-  notes?: string; // Ghi chú thêm
+
+// GPS
+gpsLat?: number;
+gpsLng?: number;
+gpsUpdatedAt?: string;
+gpsUpdatedBy?: string;
+
+photoUrl?: string;
+notes?: string;
   nonAgriTax?: string; // Thuế PNN (Đã nộp / Chưa nộp / Miễn nộp)
   customFields?: Record<string, string>; // Các trường thông tin bổ sung tự định nghĩa
 }
