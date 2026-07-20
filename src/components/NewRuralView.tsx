@@ -4,12 +4,13 @@
  */
 
 import React, { useState } from "react";
-import { 
-  Award, Map, MapPin, Eye, Plus, CheckCircle, XCircle, 
+import {
+  Award, Map, MapPin, Eye, Plus, CheckCircle, XCircle,
   Settings, Check, X, Compass, Activity, ShieldAlert, Download, Printer,
   Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Sliders
 } from "lucide-react";
 import { RuralCriteria, Household, User, UserRole } from "../types";
+import GoogleGISMap from "./GoogleGISMap";
 
 interface NewRuralViewProps {
   criteria: RuralCriteria[];
@@ -547,9 +548,13 @@ export default function NewRuralView({
         /* TAB 2: Bản đồ địa lý số hoá GIS */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Map display box (Interactive vector representation of the neighborhoods) */}
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-850 rounded-2xl h-[480px] relative overflow-hidden flex flex-col justify-between shadow-inner">
-            {renderGisMapContents(false)}
-          </div>
+          <div className="lg:col-span-2 bg-slate-900 border border-slate-850 rounded-2xl h-[480px] relative overflow-hidden shadow-inner">
+    <GoogleGISMap
+        households={households}
+        selectedHouse={selectedHousePin}
+        onSelectHouse={setSelectedHousePin}
+    />
+</div>
 
           {/* Sidebar Detail showing chosen house details */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between h-[480px]">

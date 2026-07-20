@@ -17,29 +17,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  console.log("AuthContext loading =", loading);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        const idToken = await user.getIdToken();
-        setToken(idToken);
-        
-        // Setup user on backend
-        try {
-          await fetch('/api/users/setup', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${idToken}`,
-            },
-          });
-        } catch (error) {
-          console.error('Failed to setup user:', error);
-        }
-      } else {
-        setToken(null);
-      }
-      setLoading(false);
+    console.log("AUTH CALLBACK");
+    console.log("Firebase user:", user);
+
+    setUser(user);
+
+if (user) {
+  console.log("GET TOKEN...");
+
+  const idToken = await user.getIdToken();
+  setToken(idToken);
+
+  try {
+    await fetch('/api/users/setup', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to setup user:", error);
+  }
+} else {
+  setToken(null);
+}
+
+console.log("SET LOADING FALSE");
+console.log("CALL setLoading(false)");
+setLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -47,6 +56,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async () => {
     try {
       await signInWithPopup(auth, googleAuthProvider);
+      console.log("POPUP LOGIN SUCCESS");
+console.log("Current auth user:", auth.currentUser);
     } catch (error: any) {
       const errorStr = error?.message ? String(error.message).toLowerCase() : "";
       const errorCode = error?.code ? String(error.code).toLowerCase() : "";
