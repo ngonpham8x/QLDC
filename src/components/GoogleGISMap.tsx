@@ -25,10 +25,22 @@ export default function GoogleGISMap({
     onSelectHouse
 }: Props) {
 
-    const { isLoaded } = useJsApiLoader({
-        id: "google-map",
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-    });
+    console.log(
+    "GOOGLE API KEY =",
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+);
+    console.log(
+    "GOOGLE API KEY =",
+    import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+);
+
+const { isLoaded, loadError } = useJsApiLoader({
+    id: "google-map",
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+});
+
+console.log("Google isLoaded =", isLoaded);
+console.log("Google loadError =", loadError);
 
     const center = useMemo(() => {
 

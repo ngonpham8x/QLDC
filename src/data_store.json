@@ -67,6 +67,357 @@
   ],
   "logs": [
     {
+      "id": "LOG-1784544157104",
+      "timestamp": "2026-07-20T10:42:37.104Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544156405",
+      "timestamp": "2026-07-20T10:42:36.405Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544155233",
+      "timestamp": "2026-07-20T10:42:35.233Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544154084",
+      "timestamp": "2026-07-20T10:42:34.084Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544153098",
+      "timestamp": "2026-07-20T10:42:33.098Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544152183",
+      "timestamp": "2026-07-20T10:42:32.183Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544151136",
+      "timestamp": "2026-07-20T10:42:31.136Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544150062",
+      "timestamp": "2026-07-20T10:42:30.062Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544149090",
+      "timestamp": "2026-07-20T10:42:29.090Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544148091",
+      "timestamp": "2026-07-20T10:42:28.091Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544147103",
+      "timestamp": "2026-07-20T10:42:27.103Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544146083",
+      "timestamp": "2026-07-20T10:42:26.083Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544145074",
+      "timestamp": "2026-07-20T10:42:25.074Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544144057",
+      "timestamp": "2026-07-20T10:42:24.057Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544143056",
+      "timestamp": "2026-07-20T10:42:23.056Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544142094",
+      "timestamp": "2026-07-20T10:42:22.094Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544141094",
+      "timestamp": "2026-07-20T10:42:21.094Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544140075",
+      "timestamp": "2026-07-20T10:42:20.075Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544139090",
+      "timestamp": "2026-07-20T10:42:19.090Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544138126",
+      "timestamp": "2026-07-20T10:42:18.126Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544137096",
+      "timestamp": "2026-07-20T10:42:17.096Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544136087",
+      "timestamp": "2026-07-20T10:42:16.087Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544135068",
+      "timestamp": "2026-07-20T10:42:15.068Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544134067",
+      "timestamp": "2026-07-20T10:42:14.067Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544133078",
+      "timestamp": "2026-07-20T10:42:13.078Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544132075",
+      "timestamp": "2026-07-20T10:42:12.075Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544131076",
+      "timestamp": "2026-07-20T10:42:11.076Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544130126",
+      "timestamp": "2026-07-20T10:42:10.126Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544129074",
+      "timestamp": "2026-07-20T10:42:09.074Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544128044",
+      "timestamp": "2026-07-20T10:42:08.044Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544127040",
+      "timestamp": "2026-07-20T10:42:07.040Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544126215",
+      "timestamp": "2026-07-20T10:42:06.215Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544125056",
+      "timestamp": "2026-07-20T10:42:05.056Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544124020",
+      "timestamp": "2026-07-20T10:42:04.020Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544123035",
+      "timestamp": "2026-07-20T10:42:03.035Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544122024",
+      "timestamp": "2026-07-20T10:42:02.024Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544121286",
+      "timestamp": "2026-07-20T10:42:01.286Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544120016",
+      "timestamp": "2026-07-20T10:42:00.016Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
+      "id": "LOG-1784544119103",
+      "timestamp": "2026-07-20T10:41:59.103Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
       "id": "LOG-1784544118013",
       "timestamp": "2026-07-20T10:41:58.013Z",
       "userId": "Hệ thống",
