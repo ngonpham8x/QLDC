@@ -13,7 +13,7 @@ import { Household, HouseholdStatus, HousingType, User, UserRole, Resident, Wate
 import { CameraCaptureModal } from "./CameraCaptureModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import { CccdQrScannerModal } from "./CccdQrScannerModal";
-import GoogleMapsPickerModal from "./GoogleMapsPickerModal";
+import MapPickerModal from "./MapPickerModal";
 
 export enum HouseholdGenerationType {
   SINGLE_PARENT = "SINGLE_PARENT", // Chỉ có cha hoặc mẹ sống chung với con
@@ -1900,7 +1900,7 @@ export default function HouseholdView({
         onScanSuccess={handleCccdScanSuccess}
       />
 
-      <GoogleMapsPickerModal
+      <MapPickerModal
         isOpen={isMapsPickerOpen}
         initialLat={formGpsLat}
         initialLng={formGpsLng}

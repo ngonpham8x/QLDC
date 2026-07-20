@@ -13,7 +13,7 @@ import { Resident, Gender, ResidentStatus, EducationLevel, LaborSector, User, Us
 import { CameraCaptureModal } from "./CameraCaptureModal";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import { CccdQrScannerModal } from "./CccdQrScannerModal";
-import GoogleMapsPickerModal from "./GoogleMapsPickerModal";
+import MapPickerModal from "./MapPickerModal";
 
 interface ResidentViewProps {
   residents: Resident[];
@@ -1676,7 +1676,7 @@ export default function ResidentView({
         onScanSuccess={handleCccdScanSuccess}
       />
 
-      <GoogleMapsPickerModal
+      <MapPickerModal
         isOpen={isMapsPickerOpen}
         initialLat={formGpsLat}
         initialLng={formGpsLng}
