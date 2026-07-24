@@ -67,6 +67,15 @@
   ],
   "logs": [
     {
+      "id": "LOG-1784559045011",
+      "timestamp": "2026-07-20T14:50:45.011Z",
+      "userId": "Hệ thống",
+      "userName": "Hệ thống",
+      "userRole": "Quản trị viên",
+      "action": "Thiết lập cán bộ",
+      "details": "Nhận được mã IdToken xác thực thành công từ Client"
+    },
+    {
       "id": "LOG-1784544157104",
       "timestamp": "2026-07-20T10:42:37.104Z",
       "userId": "Hệ thống",

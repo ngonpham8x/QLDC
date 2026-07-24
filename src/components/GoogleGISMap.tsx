@@ -1,18 +1,31 @@
-import React, { useMemo } from "react";
-import {
-    GoogleMap,
-    Marker,
-    InfoWindow,
-    useJsApiLoader
-} from "@react-google-maps/api";
-
+import React from "react";
 import { Household } from "../types";
+
+import {
+    MapContainer,
+    TileLayer,
+    Marker,
+    Popup
+} from "react-leaflet";
+
+import L from "leaflet";
+
+import "leaflet/dist/leaflet.css";
 
 interface Props {
     households: Household[];
-    selectedHouse: Household | null;
-    onSelectHouse: (house: Household) => void;
+    selectedHouseId?: string;
+    onSelectHouse?: (id: string) => void;
 }
+
+const markerIcon = new L.Icon({
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+});
 
 const containerStyle = {
     width: "100%",
@@ -21,122 +34,88 @@ const containerStyle = {
 
 export default function GoogleGISMap({
     households,
-    selectedHouse,
+    selectedHouseId,
     onSelectHouse
 }: Props) {
 
-    console.log(
-    "GOOGLE API KEY =",
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-);
-    console.log(
-    "GOOGLE API KEY =",
-    import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    const gpsHouses = households.filter(
+    h => h.gpsLat !== undefined && h.gpsLng !== undefined
 );
 
-const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map",
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-});
+const selectedHouse = households.find(
+    h => h.id === selectedHouseId
+);
 
-console.log("Google isLoaded =", isLoaded);
-console.log("Google loadError =", loadError);
-
-    const center = useMemo(() => {
-
-        const valid = households.filter(
-            h => h.gpsLat && h.gpsLng
-        );
-
-        if (valid.length === 0) {
-            return {
-                lat: 11.345,
-                lng: 106.125
-            };
-        }
-
-        return {
-            lat:
-                valid.reduce((s, h) => s + h.gpsLat!, 0) /
-                valid.length,
-
-            lng:
-                valid.reduce((s, h) => s + h.gpsLng!, 0) /
-                valid.length
-        };
-
-    }, [households]);
-
-    if (!isLoaded) {
-
-        return (
-            <div className="flex items-center justify-center h-full">
-                Đang tải Google Maps...
-            </div>
-        );
-
-    }
-
+const center: [number, number] =
+    selectedHouse?.gpsLat !== undefined &&
+    selectedHouse?.gpsLng !== undefined
+        ? [
+              selectedHouse.gpsLat,
+              selectedHouse.gpsLng
+          ]
+        : gpsHouses.length > 0
+        ? [
+              gpsHouses[0].gpsLat!,
+              gpsHouses[0].gpsLng!
+          ]
+        : [11.33871, 106.11864];
+    
     return (
 
-        <GoogleMap
-            mapContainerStyle={containerStyle}
-            center={center}
-            zoom={16}
-            options={{
-                mapTypeId: "hybrid",
-                streetViewControl: true,
-                fullscreenControl: true,
-                mapTypeControl: true,
-                zoomControl: true
-            }}
-        >
+    <MapContainer
+        center={center}
+        zoom={16}
+        style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: "12px"
+        }}
+    >
 
-            {households.map(h => {
+        <TileLayer
+    attribution="&copy; Esri"
+    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+/>
 
-                if (!h.gpsLat || !h.gpsLng) return null;
+{gpsHouses.map((h) => (
 
-                return (
-
-                    <Marker
-                        key={h.id}
-                        position={{
-                            lat: h.gpsLat,
-                            lng: h.gpsLng
-                        }}
-                        onClick={() => onSelectHouse(h)}
-                    />
+    <Marker
+        key={h.id}
+        icon={markerIcon}
+        position={[h.gpsLat!, h.gpsLng!]}
+        eventHandlers={{
+            click: () => onSelectHouse?.(h.id)
+        }}
+    >
+    <Popup>
+        <strong>{h.id}</strong>
+        <br />
+        {h.ownerName}
+        <br />
+        {h.address}
+    </Popup>
+</Marker>
 
                 );
 
             })}
 
             {selectedHouse && (
-
-                <InfoWindow
-                    position={{
-                        lat: selectedHouse.gpsLat!,
-                        lng: selectedHouse.gpsLng!
-                    }}
-                    onCloseClick={() => {}}
-                >
-
-                    <div>
-
-                        <b>{selectedHouse.ownerName}</b>
-
-                        <br />
-
-                        {selectedHouse.address}
-
-                    </div>
-
-                </InfoWindow>
-
-            )}
-
-        </GoogleMap>
-
+    <Marker
+        icon={markerIcon}
+        position={[
+            selectedHouse.gpsLat!,
+            selectedHouse.gpsLng!
+        ]}
+    >
+        <Popup>
+            <b>{selectedHouse.ownerName}</b>
+            <br />
+            {selectedHouse.address}
+        </Popup>
+    </Marker>
+)}
+        </MapContainer>
     );
 
 }
