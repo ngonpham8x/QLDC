@@ -19,15 +19,20 @@ interface Props {
 }
 
 const markerIcon = new L.Icon({
-    iconUrl: "https://unpkg.com",
-    shadowUrl: "https://unpkg.com",
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
     iconSize:,
     iconAnchor:,
     popupAnchor: [1, -34],
     shadowSize: [41, 41]
 });
 
+const containerStyle = {
+    width: "100%",
+    height: "100%"
+};
 
+export default function GoogleGISMap({
     households,
     selectedHouseId,
     onSelectHouse
