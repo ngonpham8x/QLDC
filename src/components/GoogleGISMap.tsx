@@ -19,8 +19,7 @@ interface Props {
 }
 
 const markerIcon = new L.Icon({
-    const markerIcon = new L.Icon({
-    iconUrl: "https://unpkg.com",
+       iconUrl: "https://unpkg.com",
     shadowUrl: "https://unpkg.com",
     iconSize:,
     iconAnchor:,
