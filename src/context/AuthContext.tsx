@@ -17,52 +17,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  console.log("AuthContext loading =", loading);
+  const [setupInProgress, setSetupInProgress] = useState(false);
+
+  console.log('AuthContext loading =', loading);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    console.log("AUTH CALLBACK");
-    console.log("Firebase user:", user);
+      console.log('AUTH CALLBACK');
+      console.log('Firebase user:', user);
 
-    setUser(user);
+      setUser(user);
 
-if (user) {
-  console.log("GET TOKEN...");
+      if (user) {
+        // Avoid re-entrancy: only run setup when not already running
+        if (setupInProgress) {
+          console.log('users/setup already in progress, skipping duplicate call');
+        } else {
+          setSetupInProgress(true);
+          try {
+            console.log('GET TOKEN...');
+            const idToken = await user.getIdToken();
+            setToken(idToken);
 
-  const idToken = await user.getIdToken();
-  setToken(idToken);
+            try {
+              const res = await fetch('/api/users/setup', {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${idToken}`,
+                  'Content-Type': 'application/json'
+                }
+              });
 
-  try {
-    await fetch('/api/users/setup', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-      },
-    });
-  } catch (error) {
-    console.error("Failed to setup user:", error);
-  }
-} else {
-  setToken(null);
-}
+              if (!res.ok) {
+                const txt = await res.text().catch(() => '(no body)');
+                console.error('users/setup returned non-ok:', res.status, txt);
+              } else {
+                console.log('users/setup OK');
+              }
+            } catch (err) {
+              console.error('Failed to call /api/users/setup:', err);
+            }
+          } catch (err) {
+            console.error('Failed to getIdToken or setup user:', err);
+            setToken(null);
+          } finally {
+            setSetupInProgress(false);
+          }
+        }
+      } else {
+        setToken(null);
+      }
 
-console.log("SET LOADING FALSE");
-console.log("CALL setLoading(false)");
-setLoading(false);
+      console.log('SET LOADING FALSE');
+      setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [setupInProgress]);
 
   const login = async () => {
     try {
       await signInWithPopup(auth, googleAuthProvider);
-      console.log("POPUP LOGIN SUCCESS");
-console.log("Current auth user:", auth.currentUser);
+      console.log('POPUP LOGIN SUCCESS');
+      console.log('Current auth user:', auth.currentUser);
     } catch (error: any) {
-      const errorStr = error?.message ? String(error.message).toLowerCase() : "";
-      const errorCode = error?.code ? String(error.code).toLowerCase() : "";
-      const isPopupOrBlocked = errorCode.includes("popup") || errorStr.includes("popup") || errorStr.includes("closed-by-user") || errorStr.includes("cancelled");
-      
+      const errorStr = error?.message ? String(error.message).toLowerCase() : '';
+      const errorCode = error?.code ? String(error.code).toLowerCase() : '';
+      const isPopupOrBlocked = errorCode.includes('popup') || errorStr.includes('popup') || errorStr.includes('closed-by-user') || errorStr.includes('cancelled');
+
       if (isPopupOrBlocked) {
         console.warn('Google sign-in popup blocked/closed in iframe, passing to handler for safe bypass:', error);
       } else {
