@@ -17,7 +17,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-const setupInProgressRef = useRef(false); (Update GIS, household management and UI improvements)
+const setupInProgressRef = useRef(false);
 
   console.log('AuthContext loading =', loading);
 
@@ -33,7 +33,7 @@ const setupInProgressRef = useRef(false); (Update GIS, household management and 
 if (setupInProgressRef.current) {
   console.log('users/setup already in progress, skipping duplicate call');
 } else {
-  setupInProgressRef.current = true; (Update GIS, household management and UI improvements)
+  setupInProgressRef.current = true;
           try {
             console.log('GET TOKEN...');
             const idToken = await user.getIdToken();
@@ -61,8 +61,7 @@ if (setupInProgressRef.current) {
             console.error('Failed to getIdToken or setup user:', err);
             setToken(null);
           } finally {
-setupInProgressRef.current = false; (Update GIS, household management and UI improvements)
-          }
+setupInProgressRef.current = false;
         }
       } else {
         setToken(null);
