@@ -17,11 +17,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-<<<<<<< HEAD
-  const [setupInProgress, setSetupInProgress] = useState(false);
-=======
-  const setupInProgressRef = useRef(false);
->>>>>>> 67690ea (Update GIS, household management and UI improvements)
+const setupInProgressRef = useRef(false); (Update GIS, household management and UI improvements)
 
   console.log('AuthContext loading =', loading);
 
@@ -34,17 +30,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (user) {
         // Avoid re-entrancy: only run setup when not already running
-<<<<<<< HEAD
-        if (setupInProgress) {
-          console.log('users/setup already in progress, skipping duplicate call');
-        } else {
-          setSetupInProgress(true);
-=======
-        if (setupInProgressRef.current) {
-          console.log('users/setup already in progress, skipping duplicate call');
-        } else {
-          setupInProgressRef.current = true;
->>>>>>> 67690ea (Update GIS, household management and UI improvements)
+if (setupInProgressRef.current) {
+  console.log('users/setup already in progress, skipping duplicate call');
+} else {
+  setupInProgressRef.current = true; (Update GIS, household management and UI improvements)
           try {
             console.log('GET TOKEN...');
             const idToken = await user.getIdToken();
@@ -72,11 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Failed to getIdToken or setup user:', err);
             setToken(null);
           } finally {
-<<<<<<< HEAD
-            setSetupInProgress(false);
-=======
-            setupInProgressRef.current = false;
->>>>>>> 67690ea (Update GIS, household management and UI improvements)
+setupInProgressRef.current = false; (Update GIS, household management and UI improvements)
           }
         }
       } else {
@@ -87,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [setupInProgress]);
+  }, []);
 
   const login = async () => {
     try {
