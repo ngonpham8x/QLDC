@@ -17,7 +17,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-const setupInProgressRef = useRef(false);
+  const setupInProgressRef = useRef(false);
 
   console.log('AuthContext loading =', loading);
 
@@ -30,10 +30,10 @@ const setupInProgressRef = useRef(false);
 
       if (user) {
         // Avoid re-entrancy: only run setup when not already running
-if (setupInProgressRef.current) {
-  console.log('users/setup already in progress, skipping duplicate call');
-} else {
-  setupInProgressRef.current = true;
+        if (setupInProgressRef.current) {
+          console.log('users/setup already in progress, skipping duplicate call');
+        } else {
+          setupInProgressRef.current = true;
           try {
             console.log('GET TOKEN...');
             const idToken = await user.getIdToken();
@@ -61,7 +61,8 @@ if (setupInProgressRef.current) {
             console.error('Failed to getIdToken or setup user:', err);
             setToken(null);
           } finally {
-setupInProgressRef.current = false;
+            setupInProgressRef.current = false;
+          }
         }
       } else {
         setToken(null);
