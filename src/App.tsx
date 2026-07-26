@@ -34,8 +34,26 @@ import MovableChatbox from "./components/MovableChatbox";
 import officialLogo from "./assets/images/logo_phuong_binh_minh_official_1782824466988.png";
 
 export default function App() {
+  console.log("========== APP RENDER ==========");
+  useEffect(() => {
+  console.log("========== APP MOUNT ==========");
+
+  return () => {
+    console.log("========== APP UNMOUNT ==========");
+  };
+}, []);
   const { user, loading: authLoading, login: contextLogin, loginWithRedirect: contextLoginWithRedirect, logout: contextLogout } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
+
+/**
+ * Tránh hiện Login khi hệ thống vẫn đang xác thực quyền.
+ */
+const [checkingAccess, setCheckingAccess] = useState(true);
+
+/**
+ * Chống gọi checkUserAccess nhiều lần cùng lúc.
+ */
+const checkingAccessRef = useRef(false);
 
   // Login Form States
   const [loginPhone, setLoginPhone] = useState("");
@@ -99,32 +117,56 @@ export default function App() {
 
 
   useEffect(() => {
-    localStorage.removeItem("currentUser");
+    //localStorage.removeItem("currentUser");
     // localStorage.removeItem("passed2FA");
   }, []);
 
   // Synchronize Google login session with local currentUser state
   // Synchronize Google login session with local currentUser state
+
 useEffect(() => {
   const checkUserAccess = async () => {
-    console.log("========== CHECK USER ==========");
-console.log("authLoading =", authLoading);
-console.log("firebase user =", user);
-console.log("currentUser =", currentUser);
-console.log("explicit_logout =", sessionStorage.getItem("explicit_logout"));
-    if (sessionStorage.getItem("explicit_logout") === "true") return;
-    if (authLoading) return;
+    console.count("CHECK USER EFFECT");
+console.log("APP UID:", user?.uid);
 
-    if (!user) {
-      console.log(">>> CLEAR CURRENT USER (Session revoked)");
-      setCurrentUser(null);
+    // Nếu Firebase vẫn đang xác thực, chỉ giữ trạng thái loading và chờ lần hiệu ứng tiếp theo
+    if (authLoading) {
+      setCheckingAccess(true);
       return;
     }
 
-    const email = user.email || "";
-    const displayName = user.displayName || email || "Cán bộ số";
+    // Không chạy song song nhiều lần
+    if (checkingAccessRef.current) {
+      return;
+    }
+
+    checkingAccessRef.current = true;
+    setCheckingAccess(true);
 
     try {
+
+      console.log("========== CHECK USER ==========");
+      console.log("authLoading =", authLoading);
+      console.log("firebase user =", user);
+      console.log("currentUser =", currentUser);
+      console.log("explicit_logout =", sessionStorage.getItem("explicit_logout"));
+
+      // Người dùng chủ động logout
+      if (sessionStorage.getItem("explicit_logout") === "true") {
+        setCurrentUser(null);
+        return;
+      }
+
+      // Chưa đăng nhập Google
+      if (!user) {
+        console.log(">>> CLEAR CURRENT USER");
+        setCurrentUser(null);
+        return;
+      }
+
+      const email = user.email || "";
+      const displayName = user.displayName || email || "Cán bộ số";
+
       const res = await fetch(
         `/api/auth/session-check?email=${encodeURIComponent(email)}`
       );
@@ -136,51 +178,67 @@ console.log("explicit_logout =", sessionStorage.getItem("explicit_logout"));
       const access = await res.json();
 
       if (access.allowed && access.role) {
-        console.log(">>> SET CURRENT USER");
-        setCurrentUser({
-          id: user.uid,
-          username: email || user.uid,
-          fullName: displayName,
-          role: access.role,
-          phone: user.phoneNumber || "0900000000",
-        });
 
-        setLoginError("");
-        return;
+        console.log(">>> SET CURRENT USER");
+
+        const newUser = {
+  id: user.uid,
+  username: email,
+  fullName: displayName,
+  role: access.role,
+  phone: user.phoneNumber || "0900000000",
+};
+
+setCurrentUser(prev => {
+  if (
+    prev &&
+    prev.id === newUser.id &&
+    prev.username === newUser.username &&
+    prev.role === newUser.role &&
+    prev.fullName === newUser.fullName &&
+    prev.phone === newUser.phone
+  ) {
+    console.log(">>> CURRENT USER KHÔNG ĐỔI");
+    return prev;
+  }
+
+  console.log(">>> SET CURRENT USER");
+  return newUser;
+});
+
+setLoginError("");
+
+return;
       }
 
       setLoginError(
         `Tài khoản Google ${email} chưa được cấp quyền truy cập. Vui lòng liên hệ Người quản lý (0912.012.114) để được cấp quyền.`
       );
 
-      try {
-        await fetch("/api/auth/unauthorized-attempt", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            displayName,
-          }),
-        });
-      } catch (e) {
-        console.warn(e);
-      }
+      setCurrentUser(null);
 
-      console.log(">>> CLEAR CURRENT USER (Session revoked)");
-      setCurrentUser(null);
       localStorage.removeItem("currentUser");
+
       await contextLogout();
+
     } catch (err) {
+
       console.error(err);
-      console.log(">>> CLEAR CURRENT USER (Session revoked)");
+
       setCurrentUser(null);
+
+    } finally {
+
+      checkingAccessRef.current = false;
+
+      setCheckingAccess(false);
+
     }
+
   };
 
   checkUserAccess();
-}, [authLoading, user, contextLogout]);
+}, [authLoading, user]);
 
   // Real-time access/revoke and role change checking heartbeat
   useEffect(() => {
@@ -216,7 +274,7 @@ console.log("explicit_logout =", sessionStorage.getItem("explicit_logout"));
     // Run check every 3 seconds for immediate response
     const interval = setInterval(checkCurrentSession, 300000);
     return () => clearInterval(interval);
-  }, [currentUser, contextLogout]);
+  }, [currentUser]);
   
   // Data State
   const [households, setHouseholds] = useState<Household[]>([]);
@@ -383,11 +441,56 @@ console.log("explicit_logout =", sessionStorage.getItem("explicit_logout"));
         fetch("/api/changes").then(r => r.json()).catch(() => ({ changes: [] }))
       ]);
 
-      const hh = Array.isArray(hhRes) ? hhRes : (hhRes.households || []);
-      const rs = Array.isArray(resRes) ? resRes : (resRes.residents || []);
+      let hh = Array.isArray(hhRes) ? hhRes : (hhRes.households || []);
+      let rs = Array.isArray(resRes) ? resRes : (resRes.residents || []);
       const bs = Array.isArray(busRes) ? busRes : (busRes.businesses || []);
       const cr = Array.isArray(critRes) ? critRes : (critRes.criteria || []);
       const ch = Array.isArray(changesRes) ? changesRes : (changesRes.changes || []);
+
+      // 1. Tự động phục hồi/tạo hộ gia đình bị thiếu từ nhân khẩu chủ hộ
+      const hhMap = new Map<string, Household>(hh.map((h: any) => [h.id, h]));
+      rs.forEach((r: any) => {
+        if (r.householdId && !hhMap.has(r.householdId)) {
+          const synthesizedHh: Household = {
+            id: r.householdId,
+            ownerId: r.id,
+            ownerName: r.fullName,
+            ownerOldCmnd: r.oldCmnd,
+            address: r.permanentAddress || r.temporaryAddress || "Chưa cập nhật địa chỉ",
+            wardId: r.wardId || "Tổ 5",
+            status: "Bình thường" as any,
+            waterSource: "Nước máy / Nước sạch" as any,
+            wasteCollectionStatus: "Đã đăng ký" as any,
+            housingType: "Có" as any,
+            isWasteFeePaid: true,
+            isPolicyFamily: false,
+            isMeritoriousFamily: false,
+            isCulturalFamily: true,
+            createdAt: new Date().toISOString().split("T")[0],
+            photoUrl: r.photoUrl || "https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&q=80&w=800",
+            gpsLat: r.gpsLat || 11.365123,
+            gpsLng: r.gpsLng || 106.112345,
+            notes: `Tự động tổng hợp từ nhân khẩu chủ hộ ${r.fullName}`
+          };
+          hhMap.set(r.householdId, synthesizedHh);
+          hh.push(synthesizedHh);
+        }
+      });
+
+      // 2. Đồng bộ tọa độ vị trí GPS của hộ dân cho các nhân khẩu thuộc hộ
+      rs = rs.map((r: any) => {
+        if (r.householdId && hhMap.has(r.householdId)) {
+          const parentHh = hhMap.get(r.householdId)!;
+          if (parentHh.gpsLat !== undefined && parentHh.gpsLng !== undefined) {
+            return {
+              ...r,
+              gpsLat: r.gpsLat ?? parentHh.gpsLat,
+              gpsLng: r.gpsLng ?? parentHh.gpsLng
+            };
+          }
+        }
+        return r;
+      });
 
       setHouseholds(hh);
       setResidents(rs);
@@ -702,23 +805,42 @@ setLoginError("Đang kiểm tra quyền truy cập...");
   }
 };
 
+  // Helper to build user & role query string for audit logging
+  const getUserQueryParams = () => {
+    const userStr = currentUser?.fullName || currentUser?.username || "Cán bộ số";
+    const roleStr = currentUser?.role || UserRole.COLLABORATOR;
+    return `user=${encodeURIComponent(userStr)}&role=${encodeURIComponent(roleStr)}`;
+  };
+
   // CRUD API wrappers with backend updates and immediate local state changes
   const addHousehold = async (newHh: Household) => {
     setHouseholds(prev => {
-      const updated = [newHh, ...prev];
+      const exists = prev.some(h => h.id === newHh.id);
+      const updated = exists ? prev.map(h => h.id === newHh.id ? newHh : h) : [newHh, ...prev];
       syncOfflineCache("households", updated);
       return updated;
     });
     try {
-      const res = await fetch("/api/households", {
+      const q = getUserQueryParams();
+      const res = await fetch(`/api/households?${q}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newHh)
       });
-      if (!res.ok) throw new Error("Server error");
+      if (res.ok) {
+        const saved: Household = await res.json();
+        setHouseholds(prev => {
+          const updated = prev.map(h => h.id === newHh.id || h.id === saved.id ? saved : h);
+          syncOfflineCache("households", updated);
+          return updated;
+        });
+        if (offlineQueue.length > 0) triggerSync();
+      } else {
+        throw new Error("Server error");
+      }
     } catch (e) {
       console.warn("API write error, queuing offline action:", e);
-      enqueueOfflineAction("/api/households", "POST", newHh, `Thêm hộ gia đình: ${newHh.ownerName}`);
+      enqueueOfflineAction(`/api/households?${getUserQueryParams()}`, "POST", newHh, `Thêm hộ gia đình: ${newHh.ownerName}`);
     }
   };
 
@@ -742,16 +864,39 @@ setLoginError("Đang kiểm tra quyền truy cập...");
       });
     }
 
+    // Đồng bộ tọa độ GPS của hộ gia đình cho tất cả các nhân khẩu thuộc hộ
+    if (updatedHh.gpsLat !== undefined && updatedHh.gpsLng !== undefined) {
+      setResidents(prev => {
+        const updated = prev.map(r => (r.householdId === oldId || r.householdId === updatedHh.id)
+          ? { ...r, gpsLat: updatedHh.gpsLat, gpsLng: updatedHh.gpsLng }
+          : r
+        );
+        syncOfflineCache("residents", updated);
+        return updated;
+      });
+    }
+
     try {
-      const res = await fetch(`/api/households/${oldId}`, {
+      const q = getUserQueryParams();
+      const res = await fetch(`/api/households/${encodeURIComponent(oldId)}?${q}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedHh)
       });
-      if (!res.ok) throw new Error("Server error");
+      if (res.ok) {
+        const saved: Household = await res.json();
+        setHouseholds(prev => {
+          const updated = prev.map(h => (h.id === oldId || h.id === saved.id) ? saved : h);
+          syncOfflineCache("households", updated);
+          return updated;
+        });
+        if (offlineQueue.length > 0) triggerSync();
+      } else {
+        throw new Error("Server error");
+      }
     } catch (e) {
       console.warn("API update error, queuing offline action:", e);
-      enqueueOfflineAction(`/api/households/${oldId}`, "PUT", updatedHh, `Cập nhật hộ gia đình: ${updatedHh.ownerName}`);
+      enqueueOfflineAction(`/api/households/${encodeURIComponent(oldId)}?${getUserQueryParams()}`, "PUT", updatedHh, `Cập nhật hộ gia đình: ${updatedHh.ownerName}`);
     }
   };
 
@@ -769,53 +914,82 @@ setLoginError("Đang kiểm tra quyền truy cập...");
       return updated;
     });
     try {
-      const res = await fetch(`/api/households/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Server error");
+      const q = getUserQueryParams();
+      const res = await fetch(`/api/households/${encodeURIComponent(id)}?${q}`, { method: "DELETE" });
+      if (res.ok) {
+        if (offlineQueue.length > 0) triggerSync();
+      } else {
+        throw new Error("Server error");
+      }
     } catch (e) {
       console.warn("API delete error, queuing offline action:", e);
-      enqueueOfflineAction(`/api/households/${id}`, "DELETE", null, `Xoá hộ gia đình: ${deletedName || id}`);
+      enqueueOfflineAction(`/api/households/${encodeURIComponent(id)}?${getUserQueryParams()}`, "DELETE", null, `Xoá hộ gia đình: ${deletedName || id}`);
     }
   };
 
   const addResident = async (newRes: Resident) => {
     setResidents(prev => {
-      const updated = [newRes, ...prev];
+      const exists = prev.some(r => r.id === newRes.id);
+      const updated = exists ? prev.map(r => r.id === newRes.id ? newRes : r) : [newRes, ...prev];
       syncOfflineCache("residents", updated);
       return updated;
     });
     try {
-      const res = await fetch("/api/residents", {
+      const q = getUserQueryParams();
+      const res = await fetch(`/api/residents?${q}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newRes)
       });
-      if (!res.ok) throw new Error("Server error");
+      if (res.ok) {
+        const saved: Resident = await res.json();
+        setResidents(prev => {
+          const updated = prev.map(r => r.id === newRes.id || r.id === saved.id ? saved : r);
+          syncOfflineCache("residents", updated);
+          return updated;
+        });
+        if (offlineQueue.length > 0) triggerSync();
+      } else {
+        throw new Error("Server error");
+      }
     } catch (e) {
       console.warn("API write error, queuing offline action:", e);
-      enqueueOfflineAction("/api/residents", "POST", newRes, `Thêm nhân khẩu: ${newRes.fullName}`);
+      enqueueOfflineAction(`/api/residents?${getUserQueryParams()}`, "POST", newRes, `Thêm nhân khẩu: ${newRes.fullName}`);
     }
   };
 
-  const updateResident = async (updatedRes: Resident) => {
-    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(updatedRes.id)) {
+  const updateResident = async (updatedRes: Resident, originalId?: string) => {
+    const residentId = originalId || updatedRes.id;
+    if (currentUser?.role === UserRole.COLLABORATOR && existingEntityIds.has(residentId)) {
       alert("Cộng tác viên không có quyền chỉnh sửa dữ liệu nhân khẩu đã có sẵn trước đó.");
       return;
     }
     setResidents(prev => {
-      const updated = prev.map(r => r.id === updatedRes.id ? updatedRes : r);
+      const updated = prev.map(r => r.id === residentId ? updatedRes : r);
       syncOfflineCache("residents", updated);
       return updated;
     });
     try {
-      const res = await fetch(`/api/residents/${updatedRes.id}`, {
+      const q = getUserQueryParams();
+      const res = await fetch(`/api/residents/${encodeURIComponent(residentId)}?${q}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedRes)
       });
-      if (!res.ok) throw new Error("Server error");
+      if (res.ok) {
+        const saved: Resident = await res.json();
+        setResidents(prev => {
+          const updated = prev.map(r => (r.id === residentId || r.id === saved.id) ? saved : r);
+          syncOfflineCache("residents", updated);
+          return updated;
+        });
+        if (offlineQueue.length > 0) triggerSync();
+      } else {
+        throw new Error("Server error");
+      }
     } catch (e) {
       console.warn("API update error, queuing offline action:", e);
-      enqueueOfflineAction(`/api/residents/${updatedRes.id}`, "PUT", updatedRes, `Cập nhật nhân khẩu: ${updatedRes.fullName}`);
+      enqueueOfflineAction(`/api/residents/${encodeURIComponent(residentId)}?${getUserQueryParams()}`, "PUT", updatedRes, `Cập nhật nhân khẩu: ${updatedRes.fullName}`);
     }
   };
 
@@ -833,11 +1007,16 @@ setLoginError("Đang kiểm tra quyền truy cập...");
       return updated;
     });
     try {
-      const res = await fetch(`/api/residents/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Server error");
+      const q = getUserQueryParams();
+      const res = await fetch(`/api/residents/${encodeURIComponent(id)}?${q}`, { method: "DELETE" });
+      if (res.ok) {
+        if (offlineQueue.length > 0) triggerSync();
+      } else {
+        throw new Error("Server error");
+      }
     } catch (e) {
       console.warn("API delete error, queuing offline action:", e);
-      enqueueOfflineAction(`/api/residents/${id}`, "DELETE", null, `Xoá nhân khẩu: ${deletedName || id}`);
+      enqueueOfflineAction(`/api/residents/${encodeURIComponent(id)}?${getUserQueryParams()}`, "DELETE", null, `Xoá nhân khẩu: ${deletedName || id}`);
     }
   };
 
@@ -1982,7 +2161,19 @@ setLoginError("Đang kiểm tra quyền truy cập...");
     <>
     <DeviceSimulator>
       {(isMobile, deviceType) => {
-        
+        // Chờ Firebase và kiểm tra quyền truy cập hoàn tất trước khi quyết định hiển thị Login hay Dashboard
+if (authLoading || checkingAccess) {
+  return (
+    <div className="h-full w-full flex items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-emerald-600 mx-auto" />
+        <p className="mt-3 text-sm font-semibold text-slate-600">
+          Đang xác thực phiên đăng nhập...
+        </p>
+      </div>
+    </div>
+  );
+}
         // Gated Login View
         if (!currentUser) {
           // Sub-view 1: Two-Factor Authentication (2FA) Code Verification

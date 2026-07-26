@@ -5,7 +5,8 @@ import {
     MapContainer,
     TileLayer,
     Marker,
-    Popup
+    Popup,
+    useMap
 } from "react-leaflet";
 
 import L from "leaflet";
@@ -14,8 +15,11 @@ import "leaflet/dist/leaflet.css";
 
 interface Props {
     households: Household[];
-    selectedHouseId?: string;
-    onSelectHouse?: (id: string) => void;
+    selectedHouse?: Household | null;
+    onSelectHouse?: (house: Household) => void;
+    center?: [number, number];
+    viewZoom?: number;
+    currentPosition?: [number, number] | null;
 }
 
 const markerIcon = new L.Icon({
@@ -27,32 +31,42 @@ const markerIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
+function RecenterMap({ center, zoom }: { center: [number, number]; zoom: number }) {
+    const map = useMap();
+    React.useEffect(() => {
+        map.setView(center, zoom);
+    }, [center, zoom, map]);
+    return null;
+}
+
+const DEFAULT_CENTER: [number, number] = [11.370679, 106.131640];
+const DEFAULT_ZOOM = 9.68;
+
 export default function GoogleGISMap({
     households,
-    selectedHouseId,
-    onSelectHouse
+    selectedHouse,
+    onSelectHouse,
+    center: forcedCenter,
+    viewZoom,
+    currentPosition
 }: Props) {
 
     const gpsHouses = households.filter(
         h => h.gpsLat !== undefined && h.gpsLng !== undefined
     );
 
-    const selectedHouse = households.find(
-        h => h.id === selectedHouseId
-    );
-
     const center: [number, number] =
-        selectedHouse?.gpsLat !== undefined &&
-        selectedHouse?.gpsLng !== undefined
+        forcedCenter ||
+        (selectedHouse?.gpsLat !== undefined && selectedHouse?.gpsLng !== undefined
             ? [selectedHouse.gpsLat, selectedHouse.gpsLng]
-            : gpsHouses.length > 0
-            ? [gpsHouses[0].gpsLat!, gpsHouses[0].gpsLng!]
-            : [11.33871, 106.11864];
+            : DEFAULT_CENTER);
+
+    const zoom = viewZoom || DEFAULT_ZOOM;
 
     return (
         <MapContainer
             center={center}
-            zoom={16}
+            zoom={zoom}
             style={{
                 width: "100%",
                 height: "100%",
@@ -63,6 +77,17 @@ export default function GoogleGISMap({
                 attribution="&copy; Esri"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
+            <RecenterMap center={center} zoom={zoom} />
+
+            {currentPosition && (
+                <Marker
+                    key="current-position"
+                    position={currentPosition}
+                    icon={markerIcon}
+                >
+                    <Popup>Vị trí hiện tại của bạn</Popup>
+                </Marker>
+            )}
 
             {gpsHouses.map((h) => (
                 <Marker
@@ -70,7 +95,7 @@ export default function GoogleGISMap({
                     icon={markerIcon}
                     position={[h.gpsLat!, h.gpsLng!]}
                     eventHandlers={{
-                        click: () => onSelectHouse?.(h.id)
+                        click: () => onSelectHouse?.(h)
                     }}
                 >
                     <Popup>

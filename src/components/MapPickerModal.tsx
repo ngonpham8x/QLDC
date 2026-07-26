@@ -42,14 +42,25 @@ let mapsLoader: Promise<void> | null = null;
 
 function loadGoogleMaps(apiKey: string) {
   if (window.google?.maps) return Promise.resolve();
+  if (!apiKey || apiKey === "YOUR_API_KEY" || !apiKey.startsWith("AIza")) {
+    return Promise.reject(new Error("VITE_GOOGLE_MAPS_API_KEY không hợp lệ."));
+  }
   if (mapsLoader) return mapsLoader;
 
   mapsLoader = new Promise((resolve, reject) => {
+    (window as any).gm_authFailure = () => {
+      mapsLoader = null;
+      reject(new Error("Khóa Google Maps không hợp lệ hoặc hết hạn."));
+    };
+
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly`;
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Không thể tải Google Maps."));
+    script.onerror = () => {
+      mapsLoader = null;
+      reject(new Error("Không thể tải Google Maps."));
+    };
     document.head.appendChild(script);
   });
 
@@ -100,10 +111,10 @@ export default function MapPickerModal({
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
   
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+  const apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
   const [selected, setSelected] = useState<Coordinates>(() => ({ ...DEFAULT_CENTER }));
   const [mapProvider, setMapProvider] = useState<"google" | "osm">(
-    apiKey ? "google" : "osm"
+    apiKey && apiKey.startsWith("AIza") ? "google" : "osm"
   );
   const [mapError, setMapError] = useState("");
   const [searchText, setSearchText] = useState("");
@@ -111,9 +122,7 @@ export default function MapPickerModal({
   const [selectedAddress, setSelectedAddress] = useState("");
 
   useEffect(() => {
-    if (mapError) {
-      setMapProvider("osm");
-    }
+    // If Google Maps JS API fails or is not available, we stay on google provider using Leaflet Satellite tiles
   }, [mapError]);
 
   const updateSelectedPosition = (position: Coordinates, panMap = true) => {
@@ -150,7 +159,6 @@ export default function MapPickerModal({
 
     if (!apiKey) {
       setMapError("Chưa cấu hình VITE_GOOGLE_MAPS_API_KEY.");
-      setMapProvider("osm");
       return;
     }
 
@@ -161,6 +169,7 @@ export default function MapPickerModal({
         const map = new window.google.maps.Map(mapElementRef.current, {
           center: initialPosition,
           zoom: 17,
+          mapTypeId: window.google.maps.MapTypeId.HYBRID,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
@@ -310,10 +319,10 @@ export default function MapPickerModal({
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                   mapProvider === "osm"
                     ? "bg-green-600 text-white"
-                    : "bg-slate-200 hover:bg-slate-300"
+                    : "bg-slate-200 hover:bg-slate-300 text-slate-700"
                 }`}
               >
-                🌍 OpenStreetMap
+                🌍 Bản đồ địa lý (GIS)
               </button>
               <button
                 type="button"
@@ -321,7 +330,7 @@ export default function MapPickerModal({
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                   mapProvider === "google"
                     ? "bg-blue-600 text-white"
-                    : "bg-slate-200 hover:bg-slate-300"
+                    : "bg-slate-200 hover:bg-slate-300 text-slate-700"
                 }`}
               >
                 🗺 Google Maps
@@ -338,7 +347,7 @@ export default function MapPickerModal({
           </div>
 
           {/* Bản đồ */}
-          {mapProvider === "google" ? (
+          {mapProvider === "google" && window.google?.maps ? (
             <div
               ref={mapElementRef}
               className="h-[360px] w-full rounded-xl border border-slate-200 bg-slate-100"
@@ -349,10 +358,17 @@ export default function MapPickerModal({
               zoom={17}
               className="h-[360px] w-full rounded-xl border border-slate-200"
             >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
+              {mapProvider === "google" ? (
+                <TileLayer
+                  attribution='&copy; <a href="https://www.esri.com/">Esri</a>, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                />
+              ) : (
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+              )}
               <Marker
                 position={[selected.lat, selected.lng]}
                 draggable={true}

@@ -7,7 +7,7 @@ import React, { useState } from "react";
 import {
   Award, Map, MapPin, Eye, Plus, CheckCircle, XCircle,
   Settings, Check, X, Compass, Activity, ShieldAlert, Download, Printer,
-  Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Sliders
+  Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw, Sliders, Crosshair
 } from "lucide-react";
 import { RuralCriteria, Household, User, UserRole } from "../types";
 import GoogleGISMap from "./GoogleGISMap";
@@ -24,8 +24,9 @@ export default function NewRuralView({
   criteria, households, currentUser, onUpdateCriteria, onExport
 }: NewRuralViewProps) {
   
-  const [activeTab, setActiveTab] = useState<"criteria" | "gis">("criteria");
+  const [activeTab, setActiveTab] = useState<"criteria" | "gis">("gis");
   const [selectedHousePin, setSelectedHousePin] = useState<Household | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<[number, number] | null>(null);
 
   // GIS Zoom, Pan, Fullscreen and Ward/Tổ Selection States
   const [mapZoom, setMapZoom] = useState(1);
@@ -59,6 +60,28 @@ export default function NewRuralView({
 
   const handleMouseUpOrLeave = () => {
     setIsDragging(false);
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Trình duyệt không hỗ trợ định vị GPS.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const currentPos: [number, number] = [
+          position.coords.latitude,
+          position.coords.longitude,
+        ];
+        setCurrentLocation(currentPos);
+        setMapZoom(1);
+        setPanOffset({ x: 0, y: 0 });
+      },
+      () => {
+        alert("Không lấy được vị trí hiện tại. Vui lòng cho phép truy cập GPS.");
+      }
+    );
   };
 
   const handleZoomIn = () => {
@@ -221,16 +244,19 @@ export default function NewRuralView({
             <Compass className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
             VỆ TINH GIS ĐỊA CHÍNH TỔ
           </p>
-          <p className="text-[9px] text-slate-400 mt-0.5 font-mono">Tọa độ trung tâm: 11.3450N, 106.1250E</p>
-          
-          {/* Interactive Tổ Selector */}
-          <div className="flex items-center gap-1.5 mt-2 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 shadow-inner">
-            <Sliders className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="text-[10px] text-slate-300 font-bold shrink-0">Chọn Tổ:</span>
+          <p className="text-[9px] text-slate-400 mt-0.5 font-mono">Tọa độ trung tâm: 11.370679N, 106.131640E</p>
+          <div className="flex flex-col gap-2 mt-3">
+            <button
+              type="button"
+              onClick={handleGetCurrentLocation}
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500 transition"
+            >
+              <span className="inline-flex items-center gap-1"><Crosshair className="w-3.5 h-3.5" /> Vị trí hiện tại</span>
+            </button>
             <select
               value={selectedGisTo}
               onChange={(e) => setSelectedGisTo(e.target.value)}
-              className="bg-transparent text-white border-none text-[10px] focus:outline-none cursor-pointer font-extrabold pr-1 focus:ring-0 w-full"
+              className="bg-slate-900 text-white border border-slate-700 text-[10px] focus:outline-none cursor-pointer font-extrabold pr-1 focus:ring-0 rounded-xl px-2 py-1 w-full"
             >
               <option value="ALL" className="bg-slate-950 text-white">Tất cả các Tổ</option>
               {uniqueTos.map(to => (
@@ -242,11 +268,12 @@ export default function NewRuralView({
 
         {/* Map Information / Hover coordinates info at bottom left */}
         <div className="absolute bottom-14 left-4 z-10 bg-slate-950/80 backdrop-blur-xs px-2.5 py-1.5 rounded-lg border border-slate-800 text-[9px] text-slate-300 select-none font-mono hidden md:block">
-          <p>Tỷ lệ: 1 : 2.500 | Phóng đại: {mapZoom.toFixed(2)}x</p>
+          <p>Góc nhìn từ trên cao: ~9,968 km | Phóng đại: {mapZoom.toFixed(2)}x</p>
           {mapZoom > 1 && <p className="text-[8px] text-emerald-400 mt-0.5 font-sans">Kéo rê chuột trái trên bản đồ để di chuyển</p>}
+          {currentLocation && (
+            <p className="text-[8px] text-emerald-300 mt-1">Vị trí hiện tại: {currentLocation[0].toFixed(6)}, {currentLocation[1].toFixed(6)}</p>
+          )}
         </div>
-
-        {/* Floating Zoom / Pan / Action Controls (Floating bottom right) */}
         <div className="absolute bottom-14 right-4 z-10 flex flex-col gap-1.5 bg-slate-950/95 backdrop-blur-md p-1.5 rounded-xl border border-slate-800 shadow-xl select-none">
           <button 
             type="button"
@@ -274,6 +301,15 @@ export default function NewRuralView({
           </button>
           
           <div className="w-full border-t border-slate-800 my-0.5"></div>
+
+          <button 
+            type="button"
+            onClick={handleGetCurrentLocation} 
+            className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors cursor-pointer"
+            title="Lấy vị trí hiện tại"
+          >
+            <Crosshair className="w-4 h-4" />
+          </button>
 
           <button 
             type="button"
@@ -548,18 +584,47 @@ export default function NewRuralView({
         /* TAB 2: Bản đồ địa lý số hoá GIS */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Map display box (Interactive vector representation of the neighborhoods) */}
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-850 rounded-2xl h-[480px] relative overflow-hidden shadow-inner">
-    <GoogleGISMap
-        households={households}
-        selectedHouse={selectedHousePin}
-        onSelectHouse={setSelectedHousePin}
-    />
-</div>
+          <div className="lg:col-span-2 relative z-0 bg-slate-900 border border-slate-850 rounded-2xl h-[420px] md:h-[460px] overflow-hidden shadow-inner">
+            <button
+              type="button"
+              onClick={handleGetCurrentLocation}
+              className="absolute top-4 right-4 z-50 rounded-full bg-emerald-600 px-3 py-2 text-[10px] font-semibold text-white hover:bg-emerald-500 transition shadow-lg"
+            >
+              <span className="inline-flex items-center gap-1">
+                <Crosshair className="w-3.5 h-3.5" />
+                Vị trí hiện tại
+              </span>
+            </button>
+            <GoogleGISMap
+              households={households}
+              selectedHouse={selectedHousePin}
+              onSelectHouse={(house) => setSelectedHousePin(house)}
+              center={currentLocation || undefined}
+              viewZoom={11.5}
+              currentPosition={currentLocation}
+            />
+          </div>
 
           {/* Sidebar Detail showing chosen house details */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between h-[480px]">
-            {renderGisDetailPanel()}
-          </div>
+<div
+  className="
+    relative
+    z-[100]
+    bg-white
+    border
+    border-slate-200
+    rounded-2xl
+    p-5
+    shadow-xl
+    flex
+    flex-col
+    justify-between
+    h-[420px]
+    md:h-[460px]
+  "
+>
+  {renderGisDetailPanel()}
+</div>
         </div>
       )}
 

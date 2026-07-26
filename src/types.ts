@@ -99,6 +99,8 @@ export interface Household {
   wasteCollectionStatus?: WasteCollectionStatus; // Thu gom rác
   waterSource?: WaterSource; // Nước sạch
   housingType: HousingType;
+  isAgri?: boolean; // Hộ nông nghiệp
+  isNonAgriTaxPaid?: boolean; // Thuế đất PNN
 
 // GPS
 gpsLat?: number;
@@ -134,9 +136,11 @@ export interface Resident {
   wardId?: string; // Tổ dân phố (e.g. Tổ 5)
   permanentAddress?: string; // Địa chỉ thường trú
   temporaryAddress?: string; // Địa chỉ tạm trú
+  createdAt?: string;
   
   // Health
   insuranceId?: string; // Mã BHYT
+  hasHealthInsurance?: boolean; // Cờ thẻ BHYT
   insuranceIssuedDate?: string;
   insuranceExpiryDate?: string;
   isElderly?: boolean; // Người già (> 60)

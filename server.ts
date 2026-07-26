@@ -115,7 +115,13 @@ if (fs.existsSync(firebaseConfigPath)) {
 }
 
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10) || 3000;
-const DATA_FILE_PATH = path.join(process.cwd(), "src", "data_store.json");
+const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_FILE_PATH = path.join(DATA_DIR, "data_store.json");
+
+// Ensure data directory exists outside of Vite's watched source tree
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 // Lazy load Gemini API
 let aiClient: GoogleGenAI | null = null;

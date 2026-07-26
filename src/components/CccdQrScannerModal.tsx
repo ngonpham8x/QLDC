@@ -186,7 +186,6 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
       const elDiaChi = document.getElementById('diaChi');
       const elNgayCap = document.getElementById('ngayCap');
       const elInfo = document.getElementById('cccd-info');
-      const elRescan = document.getElementById('rescan-btn');
 
       if (elCccd) elCccd.innerText = cccdVal;
       if (elCmnd) elCmnd.innerText = cmndVal;
@@ -197,7 +196,6 @@ export const CccdQrScannerModal: React.FC<CccdQrScannerModalProps> = ({
       if (elNgayCap) elNgayCap.innerText = ngayCapVal;
 
       if (elInfo) elInfo.style.display = 'block';
-      if (elRescan) elRescan.style.display = 'inline-block';
 
       // Chuyển đổi ngày sinh ddmmyyyy sang ISO yyyy-mm-dd để đồng bộ lại hệ thống React
       let birthIso = "";
@@ -293,9 +291,7 @@ const toggleTorch = async () => {
   const startScanner = (engineToUse?: "native" | "html5-qrcode") => {
     // Ẩn bảng kết quả cũ
     const elInfo = document.getElementById('cccd-info');
-    const elRescan = document.getElementById('rescan-btn');
     if (elInfo) elInfo.style.display = 'none';
-    if (elRescan) elRescan.style.display = 'none';
 
     setScannedResult(null);
     setStatusMessage(null);
@@ -1206,21 +1202,12 @@ ctx.imageSmoothingEnabled = false;
 
                 <div className="mt-4 pt-3 border-t border-sky-150 flex gap-2 justify-end">
                   <button
-                    id="rescan-btn"
-                    type="button"
-                    onClick={() => startScanner()}
-                    className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition cursor-pointer"
-                    style={{ display: 'none' }}
-                  >
-                    🔄 Quét lại
-                  </button>
-                  <button
                     type="button"
                     onClick={() => {
                       if (scannedResult) {
                         onScanSuccess({
                           cccd: scannedResult.cccd,
-                            oldCmnd: scannedResult.cmnd,
+                          oldCmnd: scannedResult.cmnd,
                           fullName: scannedResult.fullName,
                           birthDate: scannedResult.birthDate,
                           gender: scannedResult.gender,

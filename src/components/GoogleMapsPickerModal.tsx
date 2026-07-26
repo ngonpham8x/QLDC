@@ -22,14 +22,25 @@ let mapsLoader: Promise<void> | null = null;
 
 function loadGoogleMaps(apiKey: string) {
   if (window.google?.maps) return Promise.resolve();
+  if (!apiKey || apiKey === "YOUR_API_KEY" || !apiKey.startsWith("AIza")) {
+    return Promise.reject(new Error("VITE_GOOGLE_MAPS_API_KEY không hợp lệ."));
+  }
   if (mapsLoader) return mapsLoader;
 
   mapsLoader = new Promise((resolve, reject) => {
+    (window as any).gm_authFailure = () => {
+      mapsLoader = null;
+      reject(new Error("Khóa Google Maps không hợp lệ hoặc hết hạn."));
+    };
+
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly`;
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Không thể tải Google Maps."));
+    script.onerror = () => {
+      mapsLoader = null;
+      reject(new Error("Không thể tải Google Maps."));
+    };
     document.head.appendChild(script);
   });
 
@@ -53,7 +64,7 @@ export default function GoogleMapsPickerModal({
   const markerRef = useRef<any>(null);
   const [selected, setSelected] = useState<Coordinates>(() => ({ ...DEFAULT_CENTER }));
   const [mapError, setMapError] = useState("");
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+  const apiKey = (import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   const updateSelectedPosition = (position: Coordinates, panMap = true) => {
     setSelected(position);
