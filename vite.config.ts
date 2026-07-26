@@ -4,13 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 
 import path from 'path'
 
-export default defineConfig({
-  plugins: [
-    react(),
-    tailwindcss(),
+import { cloudflare } from "@cloudflare/vite-plugin";
 
-    
-  ],
+export default defineConfig({
+  plugins: [react(), tailwindcss(), cloudflare()],
 
   resolve: {
     alias: {
